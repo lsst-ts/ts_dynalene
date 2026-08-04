@@ -19,6 +19,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-fn main() {
-    println!("Hello, world!");
-}
+pub mod mock_constants;
+pub mod mock_plant;
+pub mod mock_pressure_transducer;
+pub mod mock_temperature_hub;
