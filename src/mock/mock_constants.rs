@@ -19,6 +19,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-fn main() {
-    println!("Hello, world!");
-}
+// Temperature in degree Celsius
+pub const PLANT_TEMPERATURE: f64 = 0.51;
+
+// Pressure in PSI
+pub const PLANT_PRESSURE: f64 = 14.7;
