@@ -1,10 +1,10 @@
 # Dynalene Controller
 
-This is the dynalene control system.
+This is the dynalene control system as the successor of [dynalene_system](https://github.com/lsst-ts/dynalene_system) LabVIEW project.
 
 ## Sensors
 
-- Temperature hub: This is a home-made device by Oliver.
+- Temperature hub: This is a home-made device by Oliver Weicha.
 In the future, we will replace it with a commercial product.
 - Pressure transducer: [PX459-100A485-I](https://www.dwyeromega.com/en-us/configurable-high-accuracy-pressure-transducers/PX409-Series/p/PX459-100A485-I).
 You can download the **PX51-PXM51-SERIES_software** in the link to get the ModBus protocol document.

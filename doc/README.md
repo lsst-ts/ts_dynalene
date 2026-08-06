@@ -1,6 +1,6 @@
 # Software Architecture
 
-This is a multiple-thread application.
+This is a multi-threaded application.
 
 ## Class Diagram
 
