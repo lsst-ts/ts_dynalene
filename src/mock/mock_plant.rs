@@ -19,27 +19,41 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::collections::HashMap;
 use std::str::from_utf8;
 
+use crate::config::Config;
 use crate::constants::{
-    ADDRESSES_PRESSURE_TRANSDUCER_BUS_0, ADDRESSES_PRESSURE_TRANSDUCER_BUS_1,
-    ADDRESSES_PRESSURE_TRANSDUCER_BUS_2, NUM_TEMPERATURE_CHANNEL, NUM_TEMPERATURE_HUB,
+    CODE_READ_HOLDING_REGISTERS, CODE_WRITE_SINGLE_REGISTER, NUM_TEMPERATURE_CHANNEL,
+    NUM_TEMPERATURE_HUB, REGISTER_ADDRESS_PIER_FAN_RESET,
 };
 use crate::mock::{
-    mock_pressure_transducer::MockPressureTransducer, mock_temperature_hub::MockTemperatureHub,
+    mock_flowmeter_group::MockFlowmeterGroup, mock_pier_fan::MockPierFan,
+    mock_power_grid_monitor::MockPowerGridMonitor,
+    mock_pressure_transducer_group::MockPressureTransducerGroup,
+    mock_temperature_hub::MockTemperatureHub,
 };
+use crate::utility::get_index_from_array;
 
-#[derive(Default)]
 pub struct MockPlant {
+    // Addresses for various devices on different buses.
+    _addresses: HashMap<String, Vec<u8>>,
     // Sensor of the temperature hubs.
-    _sensor_temperature_hubs: [MockTemperatureHub; NUM_TEMPERATURE_HUB],
-    // Sensor of the pressure transducers.
-    _sensor_pressure_transducer_bus_0:
-        [MockPressureTransducer; ADDRESSES_PRESSURE_TRANSDUCER_BUS_0.len()],
-    _sensor_pressure_transducer_bus_1:
-        [MockPressureTransducer; ADDRESSES_PRESSURE_TRANSDUCER_BUS_1.len()],
-    _sensor_pressure_transducer_bus_2:
-        [MockPressureTransducer; ADDRESSES_PRESSURE_TRANSDUCER_BUS_2.len()],
+    _sensor_temperature_hubs: Vec<MockTemperatureHub>,
+    // Groups of the pressure transducers.
+    _sensor_pressure_transducer_groups: Vec<MockPressureTransducerGroup>,
+    // Groups of the flowmeters.
+    _sensor_flowmeter_groups: Vec<MockFlowmeterGroup>,
+    // Power grid monitors.
+    _sensor_power_grid_monitors: Vec<MockPowerGridMonitor>,
+    // Pier fans.
+    _pier_fans: Vec<MockPierFan>,
+}
+
+impl Default for MockPlant {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MockPlant {
@@ -49,15 +63,33 @@ impl MockPlant {
     /// # Returns
     /// A new instance of `MockPlant`.
     pub fn new() -> Self {
-        Self {
-            _sensor_temperature_hubs: [MockTemperatureHub::new(); NUM_TEMPERATURE_HUB],
+        let config = Config::new();
+        let addresses = config.addresses;
 
-            _sensor_pressure_transducer_bus_0: ADDRESSES_PRESSURE_TRANSDUCER_BUS_0
-                .map(MockPressureTransducer::new),
-            _sensor_pressure_transducer_bus_1: ADDRESSES_PRESSURE_TRANSDUCER_BUS_1
-                .map(MockPressureTransducer::new),
-            _sensor_pressure_transducer_bus_2: ADDRESSES_PRESSURE_TRANSDUCER_BUS_2
-                .map(MockPressureTransducer::new),
+        Self {
+            _sensor_temperature_hubs: (0..NUM_TEMPERATURE_HUB)
+                .map(|_| MockTemperatureHub::new())
+                .collect(),
+            _sensor_pressure_transducer_groups: vec![
+                MockPressureTransducerGroup::new(&addresses["pressure_transducer_bus_0"]),
+                MockPressureTransducerGroup::new(&addresses["pressure_transducer_bus_1"]),
+                MockPressureTransducerGroup::new(&addresses["pressure_transducer_bus_2"]),
+            ],
+            _sensor_flowmeter_groups: vec![
+                MockFlowmeterGroup::new(&addresses["flowmeter_bus_0"]),
+                MockFlowmeterGroup::new(&addresses["flowmeter_bus_1"]),
+                MockFlowmeterGroup::new(&addresses["flowmeter_bus_2"]),
+            ],
+            _sensor_power_grid_monitors: addresses["power_grid_monitor"]
+                .iter()
+                .map(|address| MockPowerGridMonitor::new(*address))
+                .collect(),
+            _pier_fans: addresses["pier_fan"]
+                .iter()
+                .map(|address| MockPierFan::new(*address))
+                .collect(),
+
+            _addresses: addresses,
         }
     }
 
@@ -71,7 +103,7 @@ impl MockPlant {
     pub fn set_sensor_temperatures(
         &mut self,
         idx: usize,
-        temperatures: &[f64; NUM_TEMPERATURE_CHANNEL],
+        temperatures: &[f32; NUM_TEMPERATURE_CHANNEL],
     ) {
         if idx < NUM_TEMPERATURE_HUB {
             self._sensor_temperature_hubs[idx].set_temperatures(temperatures);
@@ -133,39 +165,131 @@ impl MockPlant {
 
         match idx {
             0 => {
-                let idx_sensor = ADDRESSES_PRESSURE_TRANSDUCER_BUS_0
-                    .iter()
-                    .position(|x| *x == address)?;
+                let idx_sensor =
+                    get_index_from_array(&self._addresses["pressure_transducer_bus_0"], &address)?;
 
-                Some(
-                    self._sensor_pressure_transducer_bus_0
-                        .get(idx_sensor)?
-                        .request(),
-                )
+                Some(self._sensor_pressure_transducer_groups[0].request(idx_sensor))
             }
             1 => {
-                let idx_sensor = ADDRESSES_PRESSURE_TRANSDUCER_BUS_1
-                    .iter()
-                    .position(|x| *x == address)?;
+                let idx_sensor =
+                    get_index_from_array(&self._addresses["pressure_transducer_bus_1"], &address)?;
 
-                Some(
-                    self._sensor_pressure_transducer_bus_1
-                        .get(idx_sensor)?
-                        .request(),
-                )
+                Some(self._sensor_pressure_transducer_groups[1].request(idx_sensor))
             }
             2 => {
-                let idx_sensor = ADDRESSES_PRESSURE_TRANSDUCER_BUS_2
-                    .iter()
-                    .position(|x| *x == address)?;
+                let idx_sensor =
+                    get_index_from_array(&self._addresses["pressure_transducer_bus_2"], &address)?;
 
-                Some(
-                    self._sensor_pressure_transducer_bus_2
-                        .get(idx_sensor)?
-                        .request(),
-                )
+                Some(self._sensor_pressure_transducer_groups[2].request(idx_sensor))
             }
             _ => None,
+        }
+    }
+
+    /// Request the flowmeter measurement from the specified bus.
+    ///
+    /// # Arguments
+    /// * `idx` - The index of the flowmeter bus.
+    /// * `command` - The command to read the flowmeter measurement.
+    ///
+    /// # Returns
+    /// Payload containing the flowmeter measurement if the idx and command are
+    /// valid. Otherwise, `None` is returned.
+    pub fn request_sensor_flowmeter(&self, idx: usize, command: &[u8]) -> Option<Vec<u8>> {
+        if let Some((address, num_registers)) = self.get_address_and_num_registers(command) {
+            match idx {
+                0 => {
+                    let idx_sensor =
+                        get_index_from_array(&self._addresses["flowmeter_bus_0"], &address)?;
+
+                    Some(self._sensor_flowmeter_groups[0].request(idx_sensor, num_registers))
+                }
+                1 => {
+                    let idx_sensor =
+                        get_index_from_array(&self._addresses["flowmeter_bus_1"], &address)?;
+
+                    Some(self._sensor_flowmeter_groups[1].request(idx_sensor, num_registers))
+                }
+                2 => {
+                    let idx_sensor =
+                        get_index_from_array(&self._addresses["flowmeter_bus_2"], &address)?;
+
+                    Some(self._sensor_flowmeter_groups[2].request(idx_sensor, num_registers))
+                }
+                _ => None,
+            }
+        } else {
+            None
+        }
+    }
+
+    /// Get the address and number of registers from the command of reading
+    /// holding registers.
+    ///
+    /// # Arguments
+    /// * `command` - The command to extract the address and number of
+    ///   registers from.
+    ///
+    /// # Returns
+    /// A tuple containing the address and the number of registers.
+    fn get_address_and_num_registers(&self, command: &[u8]) -> Option<(u8, u16)> {
+        // Bytes of the command should be 8.
+        if command.len() != 8 {
+            return None;
+        }
+
+        Some((command[0], u16::from_be_bytes([command[4], command[5]])))
+    }
+
+    /// Request the power grid monitor measurement.
+    ///
+    /// # Arguments
+    /// * `command` - The command to read the power grid monitor measurement.
+    ///
+    /// # Returns
+    /// Payload containing the power grid monitor measurement if the command is
+    /// valid. Otherwise, `None` is returned.
+    pub fn request_power_grid_monitor(&self, command: &[u8]) -> Option<Vec<u8>> {
+        if let Some((address, num_registers)) = self.get_address_and_num_registers(command) {
+            let idx = get_index_from_array(&self._addresses["power_grid_monitor"], &address)?;
+
+            Some(self._sensor_power_grid_monitors[idx].request(num_registers))
+        } else {
+            None
+        }
+    }
+
+    /// Request the pier fan measurement or reset the status.
+    ///
+    /// # Arguments
+    /// * `command` - The command to read the pier fan measurement or reset the
+    ///   status.
+    ///
+    /// # Returns
+    /// Payload containing the pier fan measurement or reset response if the
+    /// command is valid. Otherwise, `None` is returned.
+    pub fn request_pier_fan(&mut self, command: &[u8]) -> Option<Vec<u8>> {
+        if let Some((address, num_registers)) = self.get_address_and_num_registers(command) {
+            let idx = get_index_from_array(&self._addresses["pier_fan"], &address)?;
+            let function_code = command[1];
+            let register_address = u16::from_be_bytes([command[2], command[3]]);
+            match function_code {
+                CODE_READ_HOLDING_REGISTERS => {
+                    Some(self._pier_fans[idx].request(register_address, num_registers))
+                }
+                CODE_WRITE_SINGLE_REGISTER => {
+                    if register_address == REGISTER_ADDRESS_PIER_FAN_RESET {
+                        self._pier_fans[idx].reset();
+                        // Echo the command back as the response.
+                        Some(command.to_vec())
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            }
+        } else {
+            None
         }
     }
 }
@@ -174,7 +298,40 @@ impl MockPlant {
 mod tests {
     use super::*;
 
-    use crate::constants::{BYTES_RESPONSE_TEMPERATURE, NUM_BUS_PRESSURE_TRANSDUCER};
+    use crate::constants::{
+        BYTES_RESPONSE_TEMPERATURE, NUM_BUS_PRESSURE_TRANSDUCER, NUM_REGISTER_FLOWMETER,
+        NUM_REGISTER_POWER_GRID_MONITOR, REGISTER_ADDRESS_FLOWMETER,
+        REGISTER_ADDRESS_PIER_FAN_MAXIMUM_SPEED, REGISTER_ADDRESS_POWER_GRID_MONITOR,
+    };
+    use crate::daq::{flowmeter::Flowmeter, power_grid_monitor::PowerGridMonitor};
+
+    fn create_frame_read_holding_registers(
+        address: u8,
+        register_address: u16,
+        num_register: u16,
+    ) -> [u8; 8] {
+        let mut frame = [0; 8];
+        frame[0] = address;
+        frame[1] = CODE_READ_HOLDING_REGISTERS;
+        frame[2..4].copy_from_slice(&register_address.to_be_bytes());
+        frame[4..6].copy_from_slice(&num_register.to_be_bytes());
+        // CRC verify code is not calculated for the mock frame.
+        frame
+    }
+
+    fn create_frame_write_single_register(
+        address: u8,
+        register_address: u16,
+        value: u16,
+    ) -> [u8; 8] {
+        let mut frame = [0; 8];
+        frame[0] = address;
+        frame[1] = CODE_WRITE_SINGLE_REGISTER;
+        frame[2..4].copy_from_slice(&register_address.to_be_bytes());
+        frame[4..6].copy_from_slice(&value.to_be_bytes());
+        // CRC verify code is not calculated for the mock frame.
+        frame
+    }
 
     #[test]
     fn test_set_sensor_temperatures() {
@@ -266,5 +423,83 @@ mod tests {
                 .request_sensor_pressure(0, &"#999P\r\n".as_bytes())
                 .is_none()
         );
+    }
+
+    #[test]
+    fn test_request_sensor_flowmeter() {
+        let plant = MockPlant::new();
+
+        // Valid
+        let mut command = create_frame_read_holding_registers(
+            7,
+            REGISTER_ADDRESS_FLOWMETER,
+            NUM_REGISTER_FLOWMETER,
+        );
+
+        let response = plant.request_sensor_flowmeter(1, &command).unwrap();
+        let flowmeter = Flowmeter::from_frame(&response).unwrap();
+
+        assert_eq!(flowmeter.address, 7);
+
+        // Invalid
+        assert!(plant.request_sensor_flowmeter(3, &command).is_none());
+
+        command[0] = 8;
+        assert!(plant.request_sensor_flowmeter(1, &command).is_none());
+    }
+
+    #[test]
+    fn test_request_power_grid_monitor() {
+        let plant = MockPlant::new();
+
+        // Valid
+        let mut command = create_frame_read_holding_registers(
+            2,
+            REGISTER_ADDRESS_POWER_GRID_MONITOR,
+            NUM_REGISTER_POWER_GRID_MONITOR,
+        );
+
+        let response = plant.request_power_grid_monitor(&command).unwrap();
+        let power_grid_monitor = PowerGridMonitor::from_frame(&response).unwrap();
+
+        assert_eq!(power_grid_monitor.address, 2);
+
+        // Invalid
+        command[0] = 8;
+        assert!(plant.request_power_grid_monitor(&command).is_none());
+    }
+
+    #[test]
+    fn test_request_pier_fan_write_holding_registers() {
+        let mut plant = MockPlant::new();
+        plant._pier_fans[0].pier_fan.motor_status = 10;
+        plant._pier_fans[0].pier_fan.warning = 10;
+
+        let command = create_frame_write_single_register(12, REGISTER_ADDRESS_PIER_FAN_RESET, 1);
+
+        let response = plant.request_pier_fan(&command).unwrap();
+
+        assert_eq!(response, command);
+
+        assert_eq!(plant._pier_fans[0].pier_fan.motor_status, 0);
+        assert_eq!(plant._pier_fans[0].pier_fan.warning, 0);
+    }
+
+    #[test]
+    fn test_request_pier_fan_read_holding_registers() {
+        let mut plant = MockPlant::new();
+
+        // Valid to read the holding registers
+        let mut command =
+            create_frame_read_holding_registers(12, REGISTER_ADDRESS_PIER_FAN_MAXIMUM_SPEED, 1);
+
+        let response = plant.request_pier_fan(&command).unwrap();
+
+        assert_eq!(response.len(), 7);
+        assert_eq!(response[0], 12);
+
+        // Invalid
+        command[0] = 8;
+        assert!(plant.request_pier_fan(&command).is_none());
     }
 }
