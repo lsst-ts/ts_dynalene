@@ -19,11 +19,4 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//! # Dynalene Control System
-//!
-//! This library is a collection of control system for the Dynalene
-//! control system.
-pub mod constants;
-pub mod daq;
-pub mod mock;
-pub mod utility;
+pub mod flowmeter;
