@@ -21,7 +21,6 @@
 
 use crate::mock::mock_constants::PLANT_PRESSURE;
 
-#[derive(Default)]
 pub struct MockPressureTransducer {
     // Address of the pressure transducer.
     _address: u8,
