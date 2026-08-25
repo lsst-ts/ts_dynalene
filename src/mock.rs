@@ -22,6 +22,7 @@
 pub mod mock_constants;
 pub mod mock_flowmeter_group;
 pub mod mock_plant;
+pub mod mock_power_grid_monitor;
 pub mod mock_pressure_transducer;
 pub mod mock_pressure_transducer_group;
 pub mod mock_temperature_hub;
