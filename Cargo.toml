@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 ts_control_utils = { git = "https://github.com/lsst-ts/ts_control_utils.git", branch = "develop" }
 crc = "3.4.0"
+approx = "0.5.1"

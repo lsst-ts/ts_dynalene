@@ -546,6 +546,7 @@ dependencies = [
 name = "ts_dynalene"
 version = "0.1.0"
 dependencies = [
+ "approx",
  "crc",
  "ts_control_utils",
 ]
