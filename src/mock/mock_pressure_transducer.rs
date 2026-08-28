@@ -25,7 +25,7 @@ pub struct MockPressureTransducer {
     // Address of the pressure transducer.
     _address: u8,
     // Absolute pressure in PSI (0-100 PSI).
-    pub pressure: f64,
+    pub pressure: f32,
 }
 
 impl MockPressureTransducer {
