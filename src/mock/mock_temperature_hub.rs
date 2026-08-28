@@ -25,7 +25,7 @@ use crate::mock::mock_constants::PLANT_TEMPERATURE;
 #[derive(Default, Copy, Clone)]
 pub struct MockTemperatureHub {
     // Temperatures in degree Celsius.
-    _temperatures: [f64; NUM_TEMPERATURE_CHANNEL],
+    _temperatures: [f32; NUM_TEMPERATURE_CHANNEL],
 }
 
 impl MockTemperatureHub {
@@ -45,7 +45,7 @@ impl MockTemperatureHub {
     /// * `temperatures` - An array of temperatures in degree Celsius to set in
     ///   the mock temperature hub. The length of the array must be equal to
     ///   `NUM_TEMPERATURE_CHANNEL`.
-    pub fn set_temperatures(&mut self, temperatures: &[f64; NUM_TEMPERATURE_CHANNEL]) {
+    pub fn set_temperatures(&mut self, temperatures: &[f32; NUM_TEMPERATURE_CHANNEL]) {
         self._temperatures = *temperatures;
     }
 
@@ -53,7 +53,7 @@ impl MockTemperatureHub {
     ///
     /// # Returns
     /// An array of temperatures in degree Celsius.
-    pub fn get_temperatures(&self) -> [f64; NUM_TEMPERATURE_CHANNEL] {
+    pub fn get_temperatures(&self) -> [f32; NUM_TEMPERATURE_CHANNEL] {
         self._temperatures
     }
 
@@ -133,7 +133,7 @@ mod tests {
         assert_eq!(response.len(), BYTES_RESPONSE_TEMPERATURE);
         assert_eq!(
             from_utf8(&response).unwrap(),
-            "C01=0123.0300,C02=0012.0400,C03=0003.1235,C04=-321.0300,C05=-132.0123,C06=0000.0000,C07=1234.0230,C08=-001.0000\n"
+            "C01=0123.0300,C02=0012.0400,C03=0003.1235,C04=-321.0300,C05=-132.0123,C06=0000.0000,C07=1234.0229,C08=-001.0000\n"
         );
     }
 }
