@@ -1,6 +1,6 @@
 // This file is part of ts_dynalene.
 //
-// Developed for the Vera Rubin Observatory Systems.
+// Developed for the Vera C. Rubin Observatory Systems.
 // This product includes software developed by the LSST Project
 // (https://www.lsst.org).
 // See the COPYRIGHT file at the top-level directory of this distribution
@@ -13,13 +13,17 @@
 //
 // This program is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 pub mod mock_constants;
+pub mod mock_flowmeter_group;
+pub mod mock_pier_fan;
 pub mod mock_plant;
+pub mod mock_power_grid_monitor;
 pub mod mock_pressure_transducer;
+pub mod mock_pressure_transducer_group;
 pub mod mock_temperature_hub;

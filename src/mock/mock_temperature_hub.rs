@@ -1,6 +1,6 @@
 // This file is part of ts_dynalene.
 //
-// Developed for the Vera Rubin Observatory Systems.
+// Developed for the Vera C. Rubin Observatory Systems.
 // This product includes software developed by the LSST Project
 // (https://www.lsst.org).
 // See the COPYRIGHT file at the top-level directory of this distribution
@@ -13,11 +13,11 @@
 //
 // This program is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::constants::NUM_TEMPERATURE_CHANNEL;
 use crate::mock::mock_constants::PLANT_TEMPERATURE;
@@ -25,7 +25,7 @@ use crate::mock::mock_constants::PLANT_TEMPERATURE;
 #[derive(Default, Copy, Clone)]
 pub struct MockTemperatureHub {
     // Temperatures in degree Celsius.
-    _temperatures: [f64; NUM_TEMPERATURE_CHANNEL],
+    _temperatures: [f32; NUM_TEMPERATURE_CHANNEL],
 }
 
 impl MockTemperatureHub {
@@ -45,7 +45,7 @@ impl MockTemperatureHub {
     /// * `temperatures` - An array of temperatures in degree Celsius to set in
     ///   the mock temperature hub. The length of the array must be equal to
     ///   `NUM_TEMPERATURE_CHANNEL`.
-    pub fn set_temperatures(&mut self, temperatures: &[f64; NUM_TEMPERATURE_CHANNEL]) {
+    pub fn set_temperatures(&mut self, temperatures: &[f32; NUM_TEMPERATURE_CHANNEL]) {
         self._temperatures = *temperatures;
     }
 
@@ -53,7 +53,7 @@ impl MockTemperatureHub {
     ///
     /// # Returns
     /// An array of temperatures in degree Celsius.
-    pub fn get_temperatures(&self) -> [f64; NUM_TEMPERATURE_CHANNEL] {
+    pub fn get_temperatures(&self) -> [f32; NUM_TEMPERATURE_CHANNEL] {
         self._temperatures
     }
 
@@ -133,7 +133,7 @@ mod tests {
         assert_eq!(response.len(), BYTES_RESPONSE_TEMPERATURE);
         assert_eq!(
             from_utf8(&response).unwrap(),
-            "C01=0123.0300,C02=0012.0400,C03=0003.1235,C04=-321.0300,C05=-132.0123,C06=0000.0000,C07=1234.0230,C08=-001.0000\n"
+            "C01=0123.0300,C02=0012.0400,C03=0003.1235,C04=-321.0300,C05=-132.0123,C06=0000.0000,C07=1234.0229,C08=-001.0000\n"
         );
     }
 }
