@@ -106,6 +106,33 @@ pub const FACTOR_PIER_FAN_DC_LINK_REFERENCE_VOLTAGE: f32 = 20.0;
 // actual reference current in mA.
 pub const FACTOR_PIER_FAN_DC_LINK_REFERENCE_CURRENT: f32 = 2.0;
 
+pub const OFFSET_READ_HOLDING_REGISTERS_RECIRCULATION_PUMP: u16 = 1;
+
+// Register address of the recirculation pump relative to the offset of holding
+// registers. 1 is used for Big-endian word order master devices.
+// See svi_RP_Readout_Single.vi in the dynalene_system LabVIEW
+// project.
+pub const REGISTER_ADDRESS_RECIRCULATION_PUMP_CIM_CONFIGURATION: u16 =
+    1 - OFFSET_READ_HOLDING_REGISTERS_RECIRCULATION_PUMP;
+
+pub const REGISTER_ADDRESS_RECIRCULATION_PUMP_CONTROL: u16 =
+    101 - OFFSET_READ_HOLDING_REGISTERS_RECIRCULATION_PUMP;
+
+pub const REGISTER_ADDRESS_RECIRCULATION_PUMP_STATUS: u16 =
+    201 - OFFSET_READ_HOLDING_REGISTERS_RECIRCULATION_PUMP;
+
+pub const REGISTER_ADDRESS_RECIRCULATION_PUMP_DATA: u16 =
+    301 - OFFSET_READ_HOLDING_REGISTERS_RECIRCULATION_PUMP;
+
+// Number of the registers to read from the recirculation pump.
+pub const NUM_REGISTER_RECIRCULATION_PUMP_CIM_CONFIGURATION: u16 = 37;
+pub const NUM_REGISTER_RECIRCULATION_PUMP_CONTROL: u16 = 5;
+pub const NUM_REGISTER_RECIRCULATION_PUMP_STATUS: u16 = 12;
+pub const NUM_REGISTER_RECIRCULATION_PUMP_DATA: u16 = 43;
+
+pub const HUNDRED: f32 = 100.0;
+pub const TEN: f32 = 10.0;
+
 // The number of bytes in the response of temperature hub.
 pub const BYTES_RESPONSE_TEMPERATURE: usize = 112;
 
