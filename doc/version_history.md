@@ -1,5 +1,14 @@
 # Version History
 
+0.1.2
+
+- Add the dependency of `strum_macros`.
+- Add the **addresses_recirculation_pump** to `parameters_app.yaml` and update the **Config**.
+- Add the **RecirculationPump** class and **MockRecirculationPump** class.
+- Update the **MockPlant** class.
+- Update the class diagram.
+- Update the **README.md**.
+
 0.1.1
 
 - Add the dependencies of `crc`, `approx`, and `ts_control_utils`.
