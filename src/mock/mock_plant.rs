@@ -31,7 +31,7 @@ use crate::mock::{
     mock_flowmeter_group::MockFlowmeterGroup, mock_pier_fan::MockPierFan,
     mock_power_grid_monitor::MockPowerGridMonitor,
     mock_pressure_transducer_group::MockPressureTransducerGroup,
-    mock_temperature_hub::MockTemperatureHub,
+    mock_recirculation_pump::MockRecirculationPump, mock_temperature_hub::MockTemperatureHub,
 };
 use crate::utility::get_index_from_array;
 
@@ -48,6 +48,8 @@ pub struct MockPlant {
     _sensor_power_grid_monitors: Vec<MockPowerGridMonitor>,
     // Pier fans.
     _pier_fans: Vec<MockPierFan>,
+    // Recirculation pumps.
+    _recirculation_pumps: Vec<MockRecirculationPump>,
 }
 
 impl Default for MockPlant {
@@ -87,6 +89,10 @@ impl MockPlant {
             _pier_fans: addresses["pier_fan"]
                 .iter()
                 .map(|address| MockPierFan::new(*address))
+                .collect(),
+            _recirculation_pumps: addresses["recirculation_pump"]
+                .iter()
+                .map(|address| MockRecirculationPump::new(*address))
                 .collect(),
 
             _addresses: addresses,
@@ -292,6 +298,25 @@ impl MockPlant {
             None
         }
     }
+
+    /// Request the recirculation pump data.
+    ///
+    /// # Arguments
+    /// * `command` - The command to read the recirculation pump data.
+    ///
+    /// # Returns
+    /// Payload containing the recirculation pump data if the command is valid.
+    /// Otherwise, `None` is returned.
+    pub fn request_recirculation_pump(&mut self, command: &[u8]) -> Option<Vec<u8>> {
+        if let Some((address, num_registers)) = self.get_address_and_num_registers(command) {
+            let idx = get_index_from_array(&self._addresses["recirculation_pump"], &address)?;
+            let register_address = u16::from_be_bytes([command[2], command[3]]);
+
+            Some(self._recirculation_pumps[idx].request(register_address, num_registers))
+        } else {
+            None
+        }
+    }
 }
 
 #[cfg(test)]
@@ -300,10 +325,14 @@ mod tests {
 
     use crate::constants::{
         BYTES_RESPONSE_TEMPERATURE, NUM_BUS_PRESSURE_TRANSDUCER, NUM_REGISTER_FLOWMETER,
-        NUM_REGISTER_POWER_GRID_MONITOR, REGISTER_ADDRESS_FLOWMETER,
-        REGISTER_ADDRESS_PIER_FAN_MAXIMUM_SPEED, REGISTER_ADDRESS_POWER_GRID_MONITOR,
+        NUM_REGISTER_POWER_GRID_MONITOR, NUM_REGISTER_RECIRCULATION_PUMP_CIM_CONFIGURATION,
+        REGISTER_ADDRESS_FLOWMETER, REGISTER_ADDRESS_PIER_FAN_MAXIMUM_SPEED,
+        REGISTER_ADDRESS_POWER_GRID_MONITOR, REGISTER_ADDRESS_RECIRCULATION_PUMP_CIM_CONFIGURATION,
     };
-    use crate::daq::{flowmeter::Flowmeter, power_grid_monitor::PowerGridMonitor};
+    use crate::daq::{
+        flowmeter::Flowmeter, power_grid_monitor::PowerGridMonitor,
+        recirculation_pump::RecirculationPump,
+    };
 
     fn create_frame_read_holding_registers(
         address: u8,
@@ -481,8 +510,8 @@ mod tests {
 
         assert_eq!(response, command);
 
-        assert_eq!(plant._pier_fans[0].pier_fan.motor_status, 0);
-        assert_eq!(plant._pier_fans[0].pier_fan.warning, 0);
+        assert_eq!(plant._pier_fans[1].pier_fan.motor_status, 0);
+        assert_eq!(plant._pier_fans[1].pier_fan.warning, 0);
     }
 
     #[test]
@@ -501,5 +530,29 @@ mod tests {
         // Invalid
         command[0] = 8;
         assert!(plant.request_pier_fan(&command).is_none());
+    }
+
+    #[test]
+    fn test_request_recirculation_pump() {
+        let mut plant = MockPlant::new();
+
+        // Valid to read the holding registers
+        let command = create_frame_read_holding_registers(
+            1,
+            REGISTER_ADDRESS_RECIRCULATION_PUMP_CIM_CONFIGURATION,
+            NUM_REGISTER_RECIRCULATION_PUMP_CIM_CONFIGURATION,
+        );
+
+        let response = plant.request_recirculation_pump(&command).unwrap();
+        let recirculation_pump = RecirculationPump::from_frame(&response, &[], &[], &[]);
+
+        assert_eq!(recirculation_pump.address, 1);
+        assert_eq!(
+            recirculation_pump
+                .cim_configuration
+                .unwrap()
+                .actual_modbus_address,
+            1
+        );
     }
 }
