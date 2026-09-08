@@ -19,6 +19,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+use crate::enums::{ControlModeRecirculationPump, OperationModeRecirculationPump};
+
 // Temperature in degree Celsius
 pub const PLANT_TEMPERATURE: f32 = 0.51;
 
@@ -101,3 +103,37 @@ pub const PLANT_PIER_FAN_CURRENT_CONTROLLER_FUNCTION: u16 = 1;
 
 // The unit is watts.
 pub const PLANT_PIER_FAN_CURRENT_POWER: f32 = 71.23;
+
+pub const PLANT_PUMP_CONFIGURATION_SOFTWARE_DEFINED_BIT_RATE: u16 = 4;
+pub const PLANT_PUMP_CONFIGURATION_AUTO_ACK_CONTROL_BITS: u16 = 1;
+pub const PLANT_PUMP_CONFIGURATION_SOFTWARE_DEFINED_PARITY: u16 = 1;
+pub const PLANT_PUMP_CONFIGURATION_SOFTWARE_DEFINED_STOP_BIT: u16 = 1;
+pub const PLANT_PUMP_CONFIGURATION_GENIBUS_TX_RX_COUNT: u32 = 81234567;
+pub const PLANT_PUMP_CONFIGURATION_PRODUCT_SOFTWARE_VERSION: &str = "12.34.56.78";
+pub const PLANT_PUMP_CONFIGURATION_PRODUCT_SOFTWARE_DATE: &str = "13/02/2013";
+
+pub const PLANT_PUMP_CONTROL_CONTROL_MODE: ControlModeRecirculationPump =
+    ControlModeRecirculationPump::AutoAdapt;
+pub const PLANT_PUMP_CONTROL_OPERATION_MODE: OperationModeRecirculationPump =
+    OperationModeRecirculationPump::AutoControl;
+
+// The unit is percent.
+pub const PLANT_PUMP_CONTROL_SETPOINT: f32 = 98.82;
+
+pub const PLANT_PUMP_STATUS_PUMPS_PRESENT: u8 = 255;
+pub const PLANT_PUMP_STATUS_SYSTEM_ACTIVE_FUNCTIONS: u16 = 16382;
+
+// The unit is percent.
+pub const PLANT_PUMP_DATA_RELATIVE_PERFORMANCE: f32 = 93.12;
+
+// The unit is amperes.
+pub const PLANT_PUMP_DATA_MOTOR_CURRENT: f32 = 3.4;
+
+// The unit is watts.
+pub const PLANT_PUMP_DATA_POWER: u32 = 34512;
+
+// The unit is hours.
+pub const PLANT_PUMP_DATA_OPERATION_TIME: u32 = 2316;
+
+// The unit is kWh.
+pub const PLANT_PUMP_DATA_ENERGY: u32 = 3;

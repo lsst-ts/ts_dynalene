@@ -29,6 +29,8 @@ You can download the [user guide](https://assets.omega.com/manuals/M5221.pdf) to
 You can download the [user guide](https://productinfo.se.com/pm5500/595e2aa946e0fb0001f715da/PM5500%20user%20manual/English/HRB1684301-18.pdf) and the [Modbus register list](https://se.my.site.com/ckmContent/sfc/servlet.shepherd/document/download/069Kj00000TH2DFIA1).
 - Pier fan: [Ebmpapst EC axial fans - HyBlade](https://www.ebmpapst.com/content/dam/ebm-papst/media/catalogs/products/Catalog_Axialfans_EC-HyBlade_en.pdf) is used.
 You need to [register the account](https://www.ebmpapst.com/us/en/support/downloads/modbus-ebmbus.html) and request the Modbus document to get the Modbus protocol.
+- Recirculation pump: [Grundfos CRE 10-5 K-FJ-A-E-HQQE](https://product-selection.grundfos.com/products/cr-cre-cri-crie-crn-crne-crt-crte/cre/cre-10-5-99241450?pumpsystemid=3051387793&tab=variant-curves) is used.
+You can get the [Modbus document](https://api.grundfos.com/literature/Grundfosliterature-6012947.pdf) to know the protocol details.
 
 ## Development Environment
 

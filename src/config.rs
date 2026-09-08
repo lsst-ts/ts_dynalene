@@ -87,6 +87,11 @@ impl Config {
             get_parameter_array(filepath, "addresses_pier_fan"),
         );
 
+        addresses.insert(
+            "recirculation_pump".to_string(),
+            get_parameter_array(filepath, "addresses_recirculation_pump"),
+        );
+
         addresses
     }
 }
@@ -99,6 +104,6 @@ mod tests {
     fn test_read_addresses() {
         let addresses = Config::read_addresses(Path::new("config/parameters_app.yaml"));
 
-        assert_eq!(addresses.len(), 8);
+        assert_eq!(addresses.len(), 9);
     }
 }

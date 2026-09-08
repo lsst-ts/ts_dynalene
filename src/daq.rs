@@ -22,3 +22,4 @@
 pub mod flowmeter;
 pub mod pier_fan;
 pub mod power_grid_monitor;
+pub mod recirculation_pump;

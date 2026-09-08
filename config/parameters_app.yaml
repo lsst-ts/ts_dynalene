@@ -32,17 +32,14 @@ addresses_power_grid_monitor: [1, 2, 3]
 # For pier fan 01, the running is decided by cabinet_control_and_status.K3.
 # For pier fan 02, the running is decided by cabinet_control_and_status.K4.
 # See svi_PFs_ModbusReadout.vi in the dynalene_system LabVIEW project.
+addresses_pier_fan: [11, 12]
+
+# For the addresses of the recirculation pumps, see the app.vi in
+# dynalene_system LabVIEW project.
 #
-# Note that we can only have one fan to be turned on at a single time because
-# both fans share the same address on the same bus. If we turn on both
-# together, the Modbus communication will get the data collisions and
-# communication failures.
-#
-# Note: Based on the discussion with David, both of them are running on the
-# summit at the same time. Since they are on the same bus, based on the Modbus
-# protocol, there should be the data collision here. But they do not see this.
-# My suspicion is that one of them has a different address but the
-# dynalene_system LabVIEW project does not reflect this. Therefore, what
-# people see for both pier fans on EUI might just come from the one pier fan
-# that actually responds.
-addresses_pier_fan: [12, 12]
+# For recirculation pump 01, the running is decided by
+# cabinet_control_and_status.K1.
+# For recirculation pump 02, the running is decided by
+# cabinet_control_and_status.K2.
+# See svi_RP_Readout_All.vi in the dynalene_system LabVIEW project.
+addresses_recirculation_pump: [1, 2]
