@@ -133,8 +133,25 @@ pub const NUM_REGISTER_RECIRCULATION_PUMP_DATA: u16 = 43;
 pub const HUNDRED: f32 = 100.0;
 pub const TEN: f32 = 10.0;
 
+pub const OFFSET_READ_HOLDING_REGISTERS_CHILLER: u16 = 1;
+
+// Register addresses of the chiller.
+pub const REGISTER_ADDRESS_CHILLER_TEMPERATURE_SETPOINT: u16 =
+    1 - OFFSET_READ_HOLDING_REGISTERS_CHILLER;
+
+// Number of the registers to read from the chiller.
+pub const NUM_REGISTER_CHILLER: u16 = 24;
+
 // The number of bytes in the response of temperature hub.
 pub const BYTES_RESPONSE_TEMPERATURE: usize = 112;
 
 // The number of bytes in the response of pressure transducer.
 pub const BYTES_RESPONSE_PRESSURE: usize = 20;
+
+// The number of bytes to read the holding registers or write a single
+// register.
+pub const BYTES_HOLDING_REGISTER: usize = 8;
+
+// Maximum value for the analog input/output in volts (Mod5, NI-9207;
+// Mod8, NI-9264).
+pub const MAX_ANALOG_INPUT_OUTPUT: f64 = 10.0;
