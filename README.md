@@ -31,6 +31,8 @@ You can download the [user guide](https://productinfo.se.com/pm5500/595e2aa946e0
 You need to [register the account](https://www.ebmpapst.com/us/en/support/downloads/modbus-ebmbus.html) and request the Modbus document to get the Modbus protocol.
 - Recirculation pump: [Grundfos CRE 10-5 K-FJ-A-E-HQQE](https://product-selection.grundfos.com/products/cr-cre-cri-crie-crn-crne-crt-crte/cre/cre-10-5-99241450?pumpsystemid=3051387793&tab=variant-curves) is used.
 You can get the [Modbus document](https://api.grundfos.com/literature/Grundfosliterature-6012947.pdf) to know the protocol details.
+- Chiller: [Titan Central Water Chillers TI-25WDX-MZCD-4PX](https://www.advantageengineering.com/centralChillers/titan_central_chillers.php) is used.
+You can get the [Modbus document](https://www.advantageengineering.com/fyi/325/advantageFYI325.php) to know the product details (see Multizone III).
 
 ## Development Environment
 
