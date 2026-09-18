@@ -133,6 +133,15 @@ pub const NUM_REGISTER_RECIRCULATION_PUMP_DATA: u16 = 43;
 pub const HUNDRED: f32 = 100.0;
 pub const TEN: f32 = 10.0;
 
+pub const OFFSET_READ_HOLDING_REGISTERS_CHILLER: u16 = 1;
+
+// Register addresses of the chiller.
+pub const REGISTER_ADDRESS_CHILLER_TEMPERATURE_SETPOINT: u16 =
+    1 - OFFSET_READ_HOLDING_REGISTERS_CHILLER;
+
+// Number of the registers to read from the chiller.
+pub const NUM_REGISTER_CHILLER: u16 = 24;
+
 // The number of bytes in the response of temperature hub.
 pub const BYTES_RESPONSE_TEMPERATURE: usize = 112;
 
