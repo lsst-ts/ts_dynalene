@@ -19,6 +19,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+pub mod mock_chiller;
 pub mod mock_constants;
 pub mod mock_flowmeter_group;
 pub mod mock_pier_fan;
