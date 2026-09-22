@@ -137,3 +137,10 @@ pub const PLANT_PUMP_DATA_OPERATION_TIME: u32 = 2316;
 
 // The unit is kWh.
 pub const PLANT_PUMP_DATA_ENERGY: u32 = 3;
+
+// The unit is volts.
+pub const PLANT_TANK_LEVEL_VOLTAGE: f64 = 0.89111;
+
+// Number of analog input and output channels. See the `AnalogInput` and
+// `AnalogOutput` enums in enums.rs.
+pub const PLANT_NUM_CHANNEL_ANALOG_INPUT_OUTPUT: usize = 16;
