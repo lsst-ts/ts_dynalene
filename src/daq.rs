@@ -20,6 +20,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 pub mod chiller;
+pub mod data_acquisition;
 pub mod flowmeter;
 pub mod modbus_communicator;
 pub mod pier_fan;
