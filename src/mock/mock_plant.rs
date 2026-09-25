@@ -31,11 +31,14 @@ use crate::constants::{
 };
 use crate::enums::{AnalogInput, AnalogOutput, DigitalInputMod4, DigitalInputMod7, DigitalOutput};
 use crate::mock::{
-    mock_chiller::MockChiller, mock_constants::PLANT_NUM_CHANNEL_ANALOG_INPUT_OUTPUT,
-    mock_flowmeter_group::MockFlowmeterGroup, mock_pier_fan::MockPierFan,
+    mock_chiller::MockChiller,
+    mock_constants::{PLANT_NUM_CHANNEL_ANALOG_INPUT_OUTPUT, PLANT_TANK_LEVEL_VOLTAGE},
+    mock_flowmeter_group::MockFlowmeterGroup,
+    mock_pier_fan::MockPierFan,
     mock_power_grid_monitor::MockPowerGridMonitor,
     mock_pressure_transducer_group::MockPressureTransducerGroup,
-    mock_recirculation_pump::MockRecirculationPump, mock_temperature_hub::MockTemperatureHub,
+    mock_recirculation_pump::MockRecirculationPump,
+    mock_temperature_hub::MockTemperatureHub,
 };
 use crate::utility::get_index_from_array;
 
@@ -127,7 +130,7 @@ impl MockPlant {
 
             digital_outputs: 0,
 
-            _analog_inputs: vec![0.0; PLANT_NUM_CHANNEL_ANALOG_INPUT_OUTPUT],
+            _analog_inputs: Self::get_default_analog_inputs(),
             _analog_outputs: vec![0.0; PLANT_NUM_CHANNEL_ANALOG_INPUT_OUTPUT],
         }
     }
@@ -145,6 +148,18 @@ impl MockPlant {
             DigitalInputMod4::CloseFeedbackMov5,
         ];
         bits.iter().fold(0, |acc, x| acc | x.bit_value())
+    }
+
+    /// Get the default analog inputs for the mock plant.
+    ///
+    /// # Returns
+    /// A vector containing the default analog input values.
+    fn get_default_analog_inputs() -> Vec<f64> {
+        let mut analog_inputs = vec![0.0; PLANT_NUM_CHANNEL_ANALOG_INPUT_OUTPUT];
+        analog_inputs[AnalogInput::ReadoutTank1 as usize] = PLANT_TANK_LEVEL_VOLTAGE;
+        analog_inputs[AnalogInput::ReadoutTank2 as usize] = PLANT_TANK_LEVEL_VOLTAGE;
+
+        analog_inputs
     }
 
     /// Set the sensor of temperatures in the mock plant.
@@ -613,6 +628,14 @@ mod tests {
         let plant = MockPlant::new();
 
         assert_eq!(plant.digital_inputs_mod4, 682);
+        assert_eq!(
+            plant._analog_inputs[AnalogInput::ReadoutTank1 as usize],
+            PLANT_TANK_LEVEL_VOLTAGE
+        );
+        assert_eq!(
+            plant._analog_inputs[AnalogInput::ReadoutTank2 as usize],
+            PLANT_TANK_LEVEL_VOLTAGE
+        );
     }
 
     #[test]
