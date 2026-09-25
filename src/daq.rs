@@ -26,3 +26,4 @@ pub mod modbus_communicator;
 pub mod pier_fan;
 pub mod power_grid_monitor;
 pub mod recirculation_pump;
+pub mod tank_level;
