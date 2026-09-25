@@ -53,3 +53,12 @@ addresses_recirculation_pump: [1, 2]
 addresses_chiller: [1, 1]
 ips_chiller: ["192.168.90.1", "192.168.90.2"]
 ports_chiller: [502, 502]
+
+# The maximum values of the tank level sensor range. The unit is millimeters.
+tank_level_sensor_max_range: [4300.0, 4300.0]
+
+# The distances for the full level of the tank. The unit is millimeters.
+tank_level_distance_full: [120.0, 120.0]
+
+# The distances for the empty level of the tank. The unit is millimeters.
+tank_level_distance_empty: [980.0, 980.0]
