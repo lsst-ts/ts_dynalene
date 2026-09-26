@@ -20,8 +20,9 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::constants::{
+    FACTOR_PIER_FAN_DC_LINK_REFERENCE_CURRENT, FACTOR_PIER_FAN_DC_LINK_REFERENCE_VOLTAGE,
     MAX_VALUE_PIER_FAN_ACTUAL_SPEED, MAX_VALUE_PIER_FAN_DC_LINK_VOLTAGE_CURRENT,
-    NUM_REGISTER_PIER_FAN_ACTUAL_SPEED,
+    NUM_REGISTER_PIER_FAN_ACTUAL_SPEED, NUM_REGISTER_PIER_FAN_REFERENCE_VALUE_OF_DC_LINK_VOLTAGE,
 };
 use crate::utility::get_values_from_u8_array;
 
@@ -112,6 +113,57 @@ impl PierFan {
         }
     }
 
+    /// Get the maximum speed from a Modbus frame.
+    ///
+    /// # Arguments
+    /// * `frame` - The Modbus frame containing the maximum speed data.
+    ///
+    /// # Returns
+    /// The maximum speed in rpm if the frame is valid. Otherwise, `None`.
+    pub fn get_max_speed_from_frame(frame: &[u8]) -> Option<f32> {
+        const DATA_BYTES_PIER_FAN_MAX_SPEED: u8 = 2;
+        const FRAME_LENGTH_PIER_FAN_MAX_SPEED: usize = 5 + (DATA_BYTES_PIER_FAN_MAX_SPEED as usize);
+        if (frame.len() != FRAME_LENGTH_PIER_FAN_MAX_SPEED)
+            || (frame[2] != DATA_BYTES_PIER_FAN_MAX_SPEED)
+        {
+            return None;
+        }
+
+        Some(u16::from_be_bytes([frame[3], frame[4]]) as f32)
+    }
+
+    /// Get the reference DC link voltage and current from a Modbus frame.
+    ///
+    /// # Arguments
+    /// * `frame` - The Modbus frame containing the reference DC link voltage
+    ///   and current data.
+    ///
+    /// # Returns
+    /// A tuple containing the reference DC link voltage in volts and current
+    /// in amperes if the frame is valid. Otherwise, `None`.
+    pub fn get_ref_dc_link_voltage_current_from_frame(frame: &[u8]) -> Option<(f32, f32)> {
+        const DATA_BYTES_PIER_FAN_REF_DC_LINK_VOLTAGE_CURRENT: usize =
+            2 * (NUM_REGISTER_PIER_FAN_REFERENCE_VALUE_OF_DC_LINK_VOLTAGE as usize);
+        const FRAME_LENGTH_PIER_FAN_REF_DC_LINK_VOLTAGE_CURRENT: usize =
+            5 + DATA_BYTES_PIER_FAN_REF_DC_LINK_VOLTAGE_CURRENT;
+        if (frame.len() != FRAME_LENGTH_PIER_FAN_REF_DC_LINK_VOLTAGE_CURRENT)
+            || (frame[2] != (DATA_BYTES_PIER_FAN_REF_DC_LINK_VOLTAGE_CURRENT as u8))
+        {
+            return None;
+        }
+
+        let values = get_values_from_u8_array::<
+            u16,
+            { NUM_REGISTER_PIER_FAN_REFERENCE_VALUE_OF_DC_LINK_VOLTAGE as usize },
+        >(&frame[3..(3 + DATA_BYTES_PIER_FAN_REF_DC_LINK_VOLTAGE_CURRENT)])?;
+
+        // Change the units from mV and mA to V and A.
+        let voltage = (values[0] as f32) * FACTOR_PIER_FAN_DC_LINK_REFERENCE_VOLTAGE * 0.001;
+        let current = (values[1] as f32) * FACTOR_PIER_FAN_DC_LINK_REFERENCE_CURRENT * 0.001;
+
+        Some((voltage, current))
+    }
+
     /// Create a `PierFan` instance from a Modbus frame.
     ///
     /// # Arguments
@@ -141,10 +193,10 @@ impl PierFan {
 
         let address = frame[0];
 
-        const NUM_VALUE_PIER_FAN: usize = NUM_REGISTER_PIER_FAN_ACTUAL_SPEED as usize;
-        let values = get_values_from_u8_array::<u16, NUM_VALUE_PIER_FAN>(
-            &frame[3..3 + DATA_BYTES_PIER_FAN],
-        )?;
+        let values = get_values_from_u8_array::<
+            u16,
+            { NUM_REGISTER_PIER_FAN_ACTUAL_SPEED as usize },
+        >(&frame[3..(3 + DATA_BYTES_PIER_FAN)])?;
 
         let actual_speed = (values[0] as f32 / MAX_VALUE_PIER_FAN_ACTUAL_SPEED as f32) * max_speed;
 
@@ -192,6 +244,32 @@ impl PierFan {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_get_max_speed_from_frame_invalid() {
+        // Frame with incorrect length
+        let frame_short: [u8; 6] = [0; 6];
+        assert!(PierFan::get_max_speed_from_frame(&frame_short).is_none());
+
+        // Frame with incorrect data bytes
+        let mut frame_wrong_data_bytes: [u8; 7] = [0; 7];
+        frame_wrong_data_bytes[2] = 1;
+        assert!(PierFan::get_max_speed_from_frame(&frame_wrong_data_bytes).is_none());
+    }
+
+    #[test]
+    fn test_get_ref_dc_link_voltage_current_from_frame_invalid() {
+        // Frame with incorrect length
+        let frame_short: [u8; 8] = [0; 8];
+        assert!(PierFan::get_ref_dc_link_voltage_current_from_frame(&frame_short).is_none());
+
+        // Frame with incorrect data bytes
+        let mut frame_wrong_data_bytes: [u8; 9] = [0; 9];
+        frame_wrong_data_bytes[2] = 1;
+        assert!(
+            PierFan::get_ref_dc_link_voltage_current_from_frame(&frame_wrong_data_bytes).is_none()
+        );
+    }
 
     #[test]
     fn test_from_frame_invalid() {

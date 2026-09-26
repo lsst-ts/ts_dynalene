@@ -43,3 +43,22 @@ addresses_pier_fan: [11, 12]
 # cabinet_control_and_status.K2.
 # See svi_RP_Readout_All.vi in the dynalene_system LabVIEW project.
 addresses_recirculation_pump: [1, 2]
+
+# For the addresses, ips and ports of the chillers, see the app.vi in
+# dynalene_system LabVIEW project.
+
+# For chiller 1, the running is decided by cabinet_control_and_status.K21.
+# For chiller 2, the running is decided by cabinet_control_and_status.K22.
+# See app.vi in the dynalene_system LabVIEW project.
+addresses_chiller: [1, 1]
+ips_chiller: ["192.168.90.1", "192.168.90.2"]
+ports_chiller: [502, 502]
+
+# The maximum values of the tank level sensor range. The unit is millimeters.
+tank_level_sensor_max_range: [4300.0, 4300.0]
+
+# The distances for the full level of the tank. The unit is millimeters.
+tank_level_distance_full: [120.0, 120.0]
+
+# The distances for the empty level of the tank. The unit is millimeters.
+tank_level_distance_empty: [980.0, 980.0]

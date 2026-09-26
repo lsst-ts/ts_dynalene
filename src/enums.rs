@@ -19,7 +19,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use strum_macros::FromRepr;
+use strum::IntoEnumIterator;
+use strum_macros::{EnumIter, FromRepr};
 use ts_control_utils::enums::BitEnum;
 
 // Generates `impl BitEnum<$t> for $enum_name` bodies that just cast `self` to
@@ -36,12 +37,19 @@ macro_rules! impl_bit_enum {
     };
 }
 
+impl_bit_enum!(u32 => DigitalInputMod4, DigitalInputMod7, DigitalOutput);
 impl_bit_enum!(u16 =>
     MotorStatusPierFan,
     WarningPierFan,
     ControlStatusRecirculationPump,
     StatusRecirculationPump,
     SystemActiveFunctionRecirculationPump,
+    ProcessStatusChiller,
+    MachineStatus1Chiller,
+    MachineStatus2Chiller,
+    MachineStatus3Chiller,
+    HeartbeatChiller,
+    ZoneStatusChiller,
 );
 impl_bit_enum!(u8 => PumpIdRecirculationPump);
 
@@ -602,4 +610,322 @@ pub enum SystemActiveFunctionRecirculationPump {
     ProportionalPressureActive,
     Spare14,
     Spare15,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum ProcessStatusChiller {
+    None,
+    Alarm,
+    AlarmProcess,
+    AlarmMachine,
+    HighTemp,
+    LowTemp,
+    Spare6,
+    Spare7,
+    Spare8,
+    Spare9,
+    Spare10,
+    Spare11,
+    Spare12,
+    Spare13,
+    Spare14,
+    Spare15,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum MachineStatus1Chiller {
+    None,
+    Alarm,
+    AlarmProcess,
+    AlarmMachine,
+    Spare4,
+    ZoneLowTemp,
+    ZoneHighPressure,
+    ZoneLowPressure,
+    Spare8,
+    Spare9,
+    Spare10,
+    Spare11,
+    Spare12,
+    Spare13,
+    PhaseWrong,
+    Spare15,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum MachineStatus2Chiller {
+    None,
+    Alarm,
+    AlarmProcess,
+    AlarmMachine,
+    SensorFail,
+    Spare5,
+    Spare6,
+    Spare7,
+    Spare8,
+    Spare9,
+    Spare10,
+    Spare11,
+    Spare12,
+    Spare13,
+    Spare14,
+    Spare15,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum MachineStatus3Chiller {
+    None,
+    Alarm,
+    AlarmProcess,
+    AlarmMachine,
+    LowWaterLevel,
+    ZoneCompOverload,
+    ZoneOffPressure,
+    Spare7,
+    Spare8,
+    Spare9,
+    Spare10,
+    Spare11,
+    Spare12,
+    Spare13,
+    Spare14,
+    Spare15,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum HeartbeatChiller {
+    OneSecond,
+    Spare1,
+    Spare2,
+    Spare3,
+    SixteenSeconds,
+    Spare5,
+    Spare6,
+    Spare7,
+    Spare8,
+    Spare9,
+    Spare10,
+    Spare11,
+    Spare12,
+    Spare13,
+    Spare14,
+    Spare15,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum ZoneStatusChiller {
+    LowWaterFlow,
+    LowRefrigPressure,
+    HighRefrigPressure,
+    Freezestat,
+    LowOilPressure,
+    CompOverload,
+    ZoneOn,
+    Spare7,
+    EvaporatorOutProbe,
+    EvaporatorInProbe,
+    Output1,
+    Output2,
+    Output3,
+    Output4,
+    LpSwitch,
+    Spare15,
+}
+
+/// Bit of digital input of Mod4, NI-9425.
+#[derive(Debug, Clone, Copy)]
+pub enum DigitalInputMod4 {
+    // MOV: Motor Operated Valve
+    OpenFeedbackMov1,
+    CloseFeedbackMov1,
+    OpenFeedbackMov2,
+    CloseFeedbackMov2,
+    OpenFeedbackMov3,
+    CloseFeedbackMov3,
+    OpenFeedbackMov4,
+    CloseFeedbackMov4,
+    OpenFeedbackMov5,
+    CloseFeedbackMov5,
+    Spare10,
+    Spare11,
+    StatusK1,
+    StatusK2,
+    StatusK21,
+    StatusK22,
+    Spare16,
+    RemoteFullStatusChiller1FilterUnit1,
+    RemoteFullStatusChiller2FilterUnit2,
+    SafetyRelayStatus,
+    Spare20,
+    StatusF1,
+    StatusF21,
+    StatusF22,
+    StatusQ1,
+    StatusQ2,
+    StatusQ3,
+    StatusQ4,
+    StatusQ5,
+    StatusQ6,
+    StatusQ7,
+    Spare31,
+}
+
+/// Bit of digital input of Mod7, NI-9425.
+#[derive(Debug, Clone, Copy)]
+pub enum DigitalInputMod7 {
+    StatusK3,
+    StatusK4,
+    StatusK5,
+    StatusK6,
+    StatusK7,
+    StatusK8,
+    StatusK9,
+    StatusK10,
+    StatusFan,
+    RedStatusG3,
+    AcbStatusG3,
+    Status24VdcG1,
+    Status24VdcG2,
+    Spare13,
+    Spare14,
+    Spare15,
+    GoodHealthPierFan1,
+    GoodHealthPierFan2,
+    Spare18,
+    Spare19,
+    Spare20,
+    Spare21,
+    Spare22,
+    Spare23,
+    StartStopStatusChiller1,
+    StartStopStatusChiller2,
+    StartStopStatusRecirculationPump1,
+    StartStopStatusRecirculationPump2,
+    // One relay power phase, double confirmation about the power is missing or
+    // not.
+    RawPowerGridOutageAlarm1,
+    RawPowerGridOutageAlarm2,
+    Spare30,
+    Spare31,
+}
+
+/// Bit of digital output of Mod6, NI-9476.
+#[derive(Debug, PartialEq, Clone, Copy, EnumIter)]
+pub enum DigitalOutput {
+    // MOV: Motor Operated Valve
+    OpenMov1,
+    OpenMov2,
+    OpenMov3,
+    OpenMov4,
+    OpenMov5,
+    Spare5,
+    Spare6,
+    Spare7,
+    PowerPierFan1,
+    PowerPierFan2,
+    PowerPierFan3,
+    PowerPierFan4,
+    PowerPierFan5,
+    PowerPierFan6,
+    PowerPierFan7,
+    PowerPierFan8,
+    FanEnable,
+    Spare17,
+    Spare18,
+    Spare19,
+    StartChiller1,
+    StartChiller2,
+    StartRecirculationPump1,
+    StartRecirculationPump2,
+    Spare24,
+    Spare25,
+    Spare26,
+    PowerRecirculationPump2,
+    PowerChiller1,
+    PowerChiller2,
+    PowerRecirculationPump1,
+    Spare31,
+}
+
+impl DigitalOutput {
+    /// Get the enum from the representation.
+    ///
+    /// # Arguments
+    /// * `discriminant` - Discriminant value.
+    ///
+    /// # Returns
+    /// Enum value.
+    pub fn from_repr(discriminant: u32) -> Option<DigitalOutput> {
+        let mut bits = Vec::new();
+        for digital_output in DigitalOutput::iter() {
+            if discriminant & digital_output.bit_value() != 0 {
+                bits.push(digital_output);
+            }
+        }
+
+        if bits.len() == 1 { Some(bits[0]) } else { None }
+    }
+}
+
+/// Bit of analog input of Mod5, NI-9207.
+#[derive(Debug, Clone, Copy)]
+pub enum AnalogInput {
+    // PCV: Pressure Control Valve
+    ReadoutPcv1,
+    ReadoutPcv2,
+    // CMV: Control Mixing Valve
+    ReadoutCmv1,
+    ReadoutCmv2,
+    ReadoutCmv20,
+    // Used to calculate the tank's level
+    ReadoutTank1,
+    ReadoutTank2,
+    Spare7,
+    Spare8,
+    Spare9,
+    Spare10,
+    Spare11,
+    Spare12,
+    Spare13,
+    Spare14,
+    Spare15,
+}
+
+/// Bit of analog output of Mod8, NI-9264.
+#[derive(Debug, Clone, Copy)]
+pub enum AnalogOutput {
+    // PCV: Pressure Control Valve
+    CommandValuePcv1,
+    CommandValuePcv2,
+    // CMV: Control Mixing Valve
+    CommandValueCmv1,
+    CommandValueCmv2,
+    CommandValueCmv20,
+    Spare5,
+    Spare6,
+    Spare7,
+    SpeedSlidePierFan1,
+    SpeedSlidePierFan2,
+    Spare10,
+    Spare11,
+    Spare12,
+    Spare13,
+    Spare14,
+    Spare15,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_digital_output_from_repr() {
+        assert_eq!(
+            DigitalOutput::from_repr(4).unwrap(),
+            DigitalOutput::OpenMov3,
+        );
+
+        assert!(DigitalOutput::from_repr(0).is_none());
+        assert!(DigitalOutput::from_repr(3).is_none());
+    }
 }

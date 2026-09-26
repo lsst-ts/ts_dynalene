@@ -28,6 +28,10 @@ use ts_control_utils::utility::get_parameter_array;
 pub struct Config {
     // Addresses for various devices on different buses.
     pub addresses: HashMap<String, Vec<u8>>,
+    // IPs for the chillers.
+    pub ips_chiller: Vec<String>,
+    // Ports for the chillers.
+    pub ports_chiller: Vec<i32>,
 }
 
 impl Config {
@@ -39,6 +43,9 @@ impl Config {
         let filepath = Path::new("config/parameters_app.yaml");
         Self {
             addresses: Config::read_addresses(filepath),
+
+            ips_chiller: get_parameter_array(filepath, "ips_chiller"),
+            ports_chiller: get_parameter_array(filepath, "ports_chiller"),
         }
     }
 
@@ -92,6 +99,11 @@ impl Config {
             get_parameter_array(filepath, "addresses_recirculation_pump"),
         );
 
+        addresses.insert(
+            "chiller".to_string(),
+            get_parameter_array(filepath, "addresses_chiller"),
+        );
+
         addresses
     }
 }
@@ -101,9 +113,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_read_addresses() {
-        let addresses = Config::read_addresses(Path::new("config/parameters_app.yaml"));
+    fn test_new() {
+        let config = Config::new();
 
-        assert_eq!(addresses.len(), 9);
+        assert_eq!(config.addresses.len(), 10);
+        assert_eq!(config.ips_chiller.len(), 2);
+        assert_eq!(config.ports_chiller.len(), 2);
     }
 }
