@@ -19,18 +19,15 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crc::{CRC_16_MODBUS, Crc};
 use ts_control_utils::enums::BitEnum;
 
 use crate::constants::CODE_READ_HOLDING_REGISTERS;
 use crate::daq::chiller::Chiller;
 use crate::enums::HeartbeatChiller;
 use crate::mock::mock_constants::PLANT_TEMPERATURE;
-use crate::utility::{calculate_modbus_crc_and_update_frame, celsius_to_fahrenheit};
+use crate::utility::celsius_to_fahrenheit;
 
 pub struct MockChiller {
-    // Cyclic redundancy check (CRC) calculator for the Modbus communication.
-    _crc: Crc<u16>,
     // Chiller.
     pub chiller: Chiller,
     // Heartbeat counter to simulate the heartbeat signal of the chiller.
@@ -58,8 +55,6 @@ impl MockChiller {
         chiller.zone_2_temperature_evaporator_out = temperature as u8;
 
         Self {
-            _crc: Crc::<u16>::new(&CRC_16_MODBUS),
-
             chiller,
 
             _counter_heartbeat: 0,
@@ -86,12 +81,14 @@ impl MockChiller {
         // Each register consists of 2 bytes.
         let data_bytes = num * 2;
 
-        let mut frame_response = vec![0; 5 + (data_bytes as usize)];
-        frame_response[0] = self.chiller.address;
+        let mut frame_response = vec![0; 3 + (data_bytes as usize)];
+        frame_response[0] = self.chiller.unit_id;
         frame_response[1] = CODE_READ_HOLDING_REGISTERS;
         frame_response[2] = data_bytes as u8;
 
-        // For the indices, see the Chiller.from_frame().
+        // For the indices, see the Chiller.from_frame(). Note the index in the
+        // Chiller.from_frame() begins from the transaction ID. Here, we begin
+        // from the unit ID.
         if num >= 1 {
             frame_response[3..5].copy_from_slice(&self.chiller.temperature_setpoint.to_be_bytes());
         }
@@ -154,8 +151,6 @@ impl MockChiller {
             frame_response[49..51].copy_from_slice(&self.chiller.zone_2_status.to_be_bytes());
         }
 
-        calculate_modbus_crc_and_update_frame(&self._crc, &mut frame_response);
-
         frame_response
     }
 
@@ -214,12 +209,17 @@ mod tests {
 
         let response = mock_chiller.request(NUM_REGISTER_CHILLER);
 
-        assert_eq!(response.len(), 53);
+        assert_eq!(response.len(), 51);
         assert_eq!(response[0], 3);
         assert_eq!(response[1], CODE_READ_HOLDING_REGISTERS);
         assert_eq!(response[2], 48);
 
-        let chiller = Chiller::from_frame(&response).unwrap();
+        // Add the six bytes of the Modbus TCP header (transaction ID, protocol
+        // ID, and length) before the response data.
+        let mut frame = vec![0; 6 + response.len()];
+        frame[6..].copy_from_slice(&response);
+
+        let chiller = Chiller::from_frame(&frame).unwrap();
 
         assert_eq!(chiller, mock_chiller.chiller);
     }

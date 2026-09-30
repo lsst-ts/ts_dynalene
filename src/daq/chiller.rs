@@ -24,8 +24,10 @@ use crate::utility::get_values_from_u8_array;
 
 #[derive(Debug, PartialEq)]
 pub struct Chiller {
-    // Address of the chiller.
-    pub address: u8,
+    // Transaction ID of the Modbus TCP communication.
+    pub transaction_id: u16,
+    // Unit ID of the chiller.
+    pub unit_id: u8,
     // Temperature setpoint(0-250). The unit is degrees Fahrenheit.
     pub temperature_setpoint: u16,
     // Temperature high alarm (0-50, deviation value). The unit is degrees
@@ -72,13 +74,14 @@ impl Chiller {
     /// Chiller to have the measured temperatures and status values.
     ///
     /// # Arguments
-    /// * `address` - The address of the chiller.
+    /// * `unit_id` - The unit ID of the chiller.
     ///
     /// # Returns
     /// A new instance of `Chiller`.
-    pub fn new(address: u8) -> Self {
+    pub fn new(unit_id: u8) -> Self {
         Self {
-            address,
+            transaction_id: 0,
+            unit_id,
 
             temperature_setpoint: 0,
             temperature_high_alarm: 0,
@@ -99,7 +102,7 @@ impl Chiller {
         }
     }
 
-    /// Create a `Chiller` instance from a Modbus frame.
+    /// Create a `Chiller` instance from a Modbus TCP frame.
     ///
     /// # Arguments
     /// * `frame` - The Modbus frame containing the chiller data.
@@ -109,22 +112,24 @@ impl Chiller {
     /// `None` otherwise.
     pub fn from_frame(frame: &[u8]) -> Option<Chiller> {
         const DATA_BYTES_CHILLER: usize = 2 * (NUM_REGISTER_CHILLER as usize);
-        const FRAME_LENGTH_CHILLER: usize = 5 + DATA_BYTES_CHILLER;
-        if (frame.len() != FRAME_LENGTH_CHILLER) || (frame[2] != (DATA_BYTES_CHILLER as u8)) {
+        const FRAME_LENGTH_CHILLER: usize = 9 + DATA_BYTES_CHILLER;
+        if (frame.len() != FRAME_LENGTH_CHILLER) || (frame[8] != (DATA_BYTES_CHILLER as u8)) {
             return None;
         }
 
-        let address = frame[0];
+        let transaction_id = u16::from_be_bytes([frame[0], frame[1]]);
+        let unit_id = frame[6];
 
         let values = get_values_from_u8_array::<u16, { NUM_REGISTER_CHILLER as usize }>(
-            &frame[3..(3 + DATA_BYTES_CHILLER)],
+            &frame[9..(9 + DATA_BYTES_CHILLER)],
         )?;
 
         let (temperature_in_1, temperature_out_1) = Self::get_evaporator_temperatures(values[16]);
         let (temperature_in_2, temperature_out_2) = Self::get_evaporator_temperatures(values[17]);
 
         Some(Chiller {
-            address,
+            transaction_id,
+            unit_id,
 
             temperature_setpoint: values[0],
 
@@ -176,12 +181,12 @@ mod tests {
     #[test]
     fn test_from_frame_invalid() {
         // Frame with incorrect length
-        let frame_short: [u8; 52] = [0; 52];
+        let frame_short: [u8; 56] = [0; 56];
         assert!(Chiller::from_frame(&frame_short).is_none());
 
         // Frame with incorrect data bytes
-        let mut frame_wrong_data_bytes: [u8; 53] = [0; 53];
-        frame_wrong_data_bytes[2] = 47;
+        let mut frame_wrong_data_bytes: [u8; 57] = [0; 57];
+        frame_wrong_data_bytes[8] = 47;
         assert!(Chiller::from_frame(&frame_wrong_data_bytes).is_none());
     }
 

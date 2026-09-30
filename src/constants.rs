@@ -21,26 +21,41 @@
 
 // Function code to read the contents of a contiguous block of 16-bit
 // configuration or analog output registers from a remote slave device.
-// See: https://simplymodbus.ca/learn-rtu-fc03.html
-///
-/// The format of the command is:
-/// <address> <function_code> <register_address> <number> <CRC verify code>
-/// register_address, number, and CRC verify code have 2 bytes each.
-///
-/// The format of response to read the holding registers is:
-/// <address> <function_code> <data_bytes> <data> <CRC verify code>
+// See:
+// 1. https://simplymodbus.ca/learn-rtu-fc03.html
+// 2. https://simplymodbus.ca/learn-tcp.html
+//
+// The format of the Modbus RTU command is:
+// <address> <function_code> <register_address> <number> <CRC verify code>
+// register_address, number, and CRC verify code have 2 bytes each.
+//
+// The format of the Modbus RTU response to read the holding registers is:
+// <address> <function_code> <data_bytes> <data> <CRC verify code>
+//
+// The format of the Modbus TCP command is:
+// <transaction_id> <protocol_id> <length> <unit_id> <function_code> <register_address> <number>
+// transaction_id, protocol_id, length, register_address, and number have 2
+// bytes each.
+//
+// The format of the Modbus TCP response to read the holding registers is:
+// <transaction_id> <protocol_id> <length> <unit_id> <function_code> <data_bytes> <data>
 pub const CODE_READ_HOLDING_REGISTERS: u8 = 0x03;
 
 // Function code to write a single 16-bit configuration or analog output
 // register to a remote slave device.
 // See: https://simplymodbus.ca/learn-rtu-fc06.html
-///
-/// The format of the command is:
-/// <address> <function_code> <register_address> <value> <CRC verify code>
-/// register_address, value, and CRC verify code have 2 bytes each.
-///
-/// The response from the slave device echoes the command back if the write is
-/// successful.
+//
+// The format of the Modbus RTU command is:
+// <address> <function_code> <register_address> <value> <CRC verify code>
+// register_address, value, and CRC verify code have 2 bytes each.
+//
+// The format of the Modbus TCP command to write a single register is:
+// <transaction_id> <protocol_id> <length> <unit_id> <function_code> <register_address> <value>
+// transaction_id, protocol_id, length, register_address, and value have 2
+// bytes each.
+//
+// The response from the slave device echoes the command back if the write is
+// successful.
 pub const CODE_WRITE_SINGLE_REGISTER: u8 = 0x06;
 
 pub const NUM_TEMPERATURE_HUB: usize = 3;
@@ -149,8 +164,12 @@ pub const BYTES_RESPONSE_TEMPERATURE: usize = 112;
 pub const BYTES_RESPONSE_PRESSURE: usize = 20;
 
 // The number of bytes to read the holding registers or write a single
-// register.
-pub const BYTES_HOLDING_REGISTER: usize = 8;
+// register for the Modbus RTU protocol.
+pub const BYTES_HOLDING_REGISTER_RTU: usize = 8;
+
+// The number of bytes to read the holding registers or write a single
+// register for the Modbus TCP protocol.
+pub const BYTES_HOLDING_REGISTER_TCP: usize = 12;
 
 // Maximum value for the analog input/output in volts (Mod5, NI-9207;
 // Mod8, NI-9264).

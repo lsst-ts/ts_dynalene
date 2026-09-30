@@ -24,9 +24,9 @@ use regex::{Captures, Regex};
 use std::str::{FromStr, from_utf8};
 
 use crate::constants::{
-    BYTES_HOLDING_REGISTER, BYTES_RESPONSE_PRESSURE, BYTES_RESPONSE_TEMPERATURE,
-    CODE_READ_HOLDING_REGISTERS, CODE_WRITE_SINGLE_REGISTER, NUM_REGISTER_CHILLER,
-    NUM_REGISTER_FLOWMETER, NUM_REGISTER_PIER_FAN_ACTUAL_SPEED,
+    BYTES_HOLDING_REGISTER_RTU, BYTES_HOLDING_REGISTER_TCP, BYTES_RESPONSE_PRESSURE,
+    BYTES_RESPONSE_TEMPERATURE, CODE_READ_HOLDING_REGISTERS, CODE_WRITE_SINGLE_REGISTER,
+    NUM_REGISTER_CHILLER, NUM_REGISTER_FLOWMETER, NUM_REGISTER_PIER_FAN_ACTUAL_SPEED,
     NUM_REGISTER_PIER_FAN_REFERENCE_VALUE_OF_DC_LINK_VOLTAGE, NUM_REGISTER_POWER_GRID_MONITOR,
     NUM_REGISTER_RECIRCULATION_PUMP_CIM_CONFIGURATION, NUM_REGISTER_RECIRCULATION_PUMP_CONTROL,
     NUM_REGISTER_RECIRCULATION_PUMP_DATA, NUM_REGISTER_RECIRCULATION_PUMP_STATUS,
@@ -78,9 +78,10 @@ impl ModbusCommunicator {
     ///
     /// # Returns
     /// A byte array representing the frame to read the flowmeter.
-    pub fn create_frame_read_flowmeter(&self, address: u8) -> [u8; BYTES_HOLDING_REGISTER] {
-        self.create_frame_read_holding_registers(
+    pub fn create_frame_read_flowmeter(&self, address: u8) -> [u8; BYTES_HOLDING_REGISTER_RTU] {
+        self.create_request_frame_rtu(
             address,
+            CODE_READ_HOLDING_REGISTERS,
             REGISTER_ADDRESS_FLOWMETER,
             NUM_REGISTER_FLOWMETER,
         )
@@ -96,9 +97,10 @@ impl ModbusCommunicator {
     pub fn create_frame_read_power_grid_monitor(
         &self,
         address: u8,
-    ) -> [u8; BYTES_HOLDING_REGISTER] {
-        self.create_frame_read_holding_registers(
+    ) -> [u8; BYTES_HOLDING_REGISTER_RTU] {
+        self.create_request_frame_rtu(
             address,
+            CODE_READ_HOLDING_REGISTERS,
             REGISTER_ADDRESS_POWER_GRID_MONITOR,
             NUM_REGISTER_POWER_GRID_MONITOR,
         )
@@ -114,9 +116,10 @@ impl ModbusCommunicator {
     pub fn create_frame_read_pier_fan_max_speed(
         &self,
         address: u8,
-    ) -> [u8; BYTES_HOLDING_REGISTER] {
-        self.create_frame_read_holding_registers(
+    ) -> [u8; BYTES_HOLDING_REGISTER_RTU] {
+        self.create_request_frame_rtu(
             address,
+            CODE_READ_HOLDING_REGISTERS,
             REGISTER_ADDRESS_PIER_FAN_MAXIMUM_SPEED,
             1,
         )
@@ -134,9 +137,10 @@ impl ModbusCommunicator {
     pub fn create_frame_read_pier_fan_ref_dc_link_voltage_and_current(
         &self,
         address: u8,
-    ) -> [u8; BYTES_HOLDING_REGISTER] {
-        self.create_frame_read_holding_registers(
+    ) -> [u8; BYTES_HOLDING_REGISTER_RTU] {
+        self.create_request_frame_rtu(
             address,
+            CODE_READ_HOLDING_REGISTERS,
             REGISTER_ADDRESS_PIER_FAN_REFERENCE_VALUE_OF_DC_LINK_VOLTAGE,
             NUM_REGISTER_PIER_FAN_REFERENCE_VALUE_OF_DC_LINK_VOLTAGE,
         )
@@ -149,9 +153,10 @@ impl ModbusCommunicator {
     ///
     /// # Returns
     /// A byte array representing the frame to read the pier fan.
-    pub fn create_frame_read_pier_fan(&self, address: u8) -> [u8; BYTES_HOLDING_REGISTER] {
-        self.create_frame_read_holding_registers(
+    pub fn create_frame_read_pier_fan(&self, address: u8) -> [u8; BYTES_HOLDING_REGISTER_RTU] {
+        self.create_request_frame_rtu(
             address,
+            CODE_READ_HOLDING_REGISTERS,
             REGISTER_ADDRESS_PIER_FAN_ACTUAL_SPEED,
             NUM_REGISTER_PIER_FAN_ACTUAL_SPEED,
         )
@@ -169,69 +174,115 @@ impl ModbusCommunicator {
     pub fn create_frame_read_recirculation_pump(
         &self,
         address: u8,
-    ) -> [[u8; BYTES_HOLDING_REGISTER]; 4] {
+    ) -> [[u8; BYTES_HOLDING_REGISTER_RTU]; 4] {
         [
-            self.create_frame_read_holding_registers(
+            self.create_request_frame_rtu(
                 address,
+                CODE_READ_HOLDING_REGISTERS,
                 REGISTER_ADDRESS_RECIRCULATION_PUMP_CIM_CONFIGURATION,
                 NUM_REGISTER_RECIRCULATION_PUMP_CIM_CONFIGURATION,
             ),
-            self.create_frame_read_holding_registers(
+            self.create_request_frame_rtu(
                 address,
+                CODE_READ_HOLDING_REGISTERS,
                 REGISTER_ADDRESS_RECIRCULATION_PUMP_CONTROL,
                 NUM_REGISTER_RECIRCULATION_PUMP_CONTROL,
             ),
-            self.create_frame_read_holding_registers(
+            self.create_request_frame_rtu(
                 address,
+                CODE_READ_HOLDING_REGISTERS,
                 REGISTER_ADDRESS_RECIRCULATION_PUMP_STATUS,
                 NUM_REGISTER_RECIRCULATION_PUMP_STATUS,
             ),
-            self.create_frame_read_holding_registers(
+            self.create_request_frame_rtu(
                 address,
+                CODE_READ_HOLDING_REGISTERS,
                 REGISTER_ADDRESS_RECIRCULATION_PUMP_DATA,
                 NUM_REGISTER_RECIRCULATION_PUMP_DATA,
             ),
         ]
     }
 
-    /// Create a frame to read the chiller.
+    /// Create a Modbus RTU request frame.
     ///
     /// # Arguments
     /// * `address` - The address of the device to communicate with.
+    /// * `code` - The Modbus function code.
+    /// * `register_address` - The starting address of the register.
+    /// * `num_register_or_value` - The number of holding registers to read
+    ///   or a value to write.
+    ///
+    /// # Returns
+    /// A request frame.
+    fn create_request_frame_rtu(
+        &self,
+        address: u8,
+        code: u8,
+        register_address: u16,
+        num_register_or_value: u16,
+    ) -> [u8; BYTES_HOLDING_REGISTER_RTU] {
+        let mut frame = [0; BYTES_HOLDING_REGISTER_RTU];
+        frame[0] = address;
+        frame[1] = code;
+        frame[2..4].copy_from_slice(&register_address.to_be_bytes());
+        frame[4..6].copy_from_slice(&num_register_or_value.to_be_bytes());
+
+        calculate_modbus_crc_and_update_frame(&self._crc, &mut frame);
+
+        frame
+    }
+
+    /// Create a frame to read the chiller.
+    ///
+    /// # Arguments
+    /// * `transaction_id` - The transaction ID for the Modbus TCP
+    ///   communication.
+    /// * `unit_id` - The unit ID of the device to communicate with.
     ///
     /// # Returns
     /// A byte array representing the frame to read the chiller.
-    pub fn create_frame_read_chiller(&self, address: u8) -> [u8; BYTES_HOLDING_REGISTER] {
-        self.create_frame_read_holding_registers(
-            address,
+    pub fn create_frame_read_chiller(
+        &self,
+        transaction_id: u16,
+        unit_id: u8,
+    ) -> [u8; BYTES_HOLDING_REGISTER_TCP] {
+        self.create_request_frame_tcp(
+            transaction_id,
+            unit_id,
+            CODE_READ_HOLDING_REGISTERS,
             REGISTER_ADDRESS_CHILLER_TEMPERATURE_SETPOINT,
             NUM_REGISTER_CHILLER,
         )
     }
 
-    /// Create a frame to read holding registers.
+    /// Create a Modbus TCP request frame.
     ///
     /// # Arguments
-    /// * `address` - The address of the device to communicate with.
-    /// * `register_address` - The starting address of the holding registers to
-    ///   read.
-    /// * `num_register` - The number of holding registers to read.
+    /// * `transaction_id` - The transaction ID for the Modbus TCP
+    ///   communication.
+    /// * `unit_id` - The unit ID of the device to communicate with.
+    /// * `code` - The Modbus function code.
+    /// * `register_address` - The starting address of the register.
+    /// * `num_register_or_value` - The number of holding registers to read
+    ///   or a value to write.
     ///
     /// # Returns
-    /// A byte array representing the frame to read holding registers.
-    fn create_frame_read_holding_registers(
+    /// A request frame.
+    fn create_request_frame_tcp(
         &self,
-        address: u8,
+        transaction_id: u16,
+        unit_id: u8,
+        code: u8,
         register_address: u16,
-        num_register: u16,
-    ) -> [u8; BYTES_HOLDING_REGISTER] {
-        let mut frame = [0; BYTES_HOLDING_REGISTER];
-        frame[0] = address;
-        frame[1] = CODE_READ_HOLDING_REGISTERS;
-        frame[2..4].copy_from_slice(&register_address.to_be_bytes());
-        frame[4..6].copy_from_slice(&num_register.to_be_bytes());
-
-        calculate_modbus_crc_and_update_frame(&self._crc, &mut frame);
+        num_register_or_value: u16,
+    ) -> [u8; BYTES_HOLDING_REGISTER_TCP] {
+        let mut frame = [0; BYTES_HOLDING_REGISTER_TCP];
+        frame[0..2].copy_from_slice(&transaction_id.to_be_bytes());
+        frame[4..6].copy_from_slice(&6u16.to_be_bytes());
+        frame[6] = unit_id;
+        frame[7] = code;
+        frame[8..10].copy_from_slice(&register_address.to_be_bytes());
+        frame[10..12].copy_from_slice(&num_register_or_value.to_be_bytes());
 
         frame
     }
@@ -375,10 +426,6 @@ impl ModbusCommunicator {
     /// # Returns
     /// A `Chiller` instance if the frame is valid. Otherwise, `None`.
     pub fn read_chiller_from_frame(&self, frame: &[u8]) -> Option<Chiller> {
-        if !verify_modbus_crc(&self._crc, frame) {
-            return None;
-        }
-
         Chiller::from_frame(frame)
     }
 
@@ -389,14 +436,21 @@ impl ModbusCommunicator {
     ///
     /// # Returns
     /// A byte array representing the frame to reset the pier fan.
-    pub fn create_frame_pier_fan_reset(&self, address: u8) -> [u8; BYTES_HOLDING_REGISTER] {
-        self.create_frame_write_single_register(address, REGISTER_ADDRESS_PIER_FAN_RESET, 1)
+    pub fn create_frame_pier_fan_reset(&self, address: u8) -> [u8; BYTES_HOLDING_REGISTER_RTU] {
+        self.create_request_frame_rtu(
+            address,
+            CODE_WRITE_SINGLE_REGISTER,
+            REGISTER_ADDRESS_PIER_FAN_RESET,
+            1,
+        )
     }
 
     /// Create a frame to set the chiller temperature.
     ///
     /// # Arguments
-    /// * `address` - The address of the device to communicate with.
+    /// * `transaction_id` - The transaction ID for the Modbus TCP
+    ///   communication.
+    /// * `unit_id` - The unit ID of the device to communicate with.
     /// * `temperature` - The temperature to set for the chiller. The unit is
     ///   the degree Fahrenheit.
     ///
@@ -404,40 +458,17 @@ impl ModbusCommunicator {
     /// A byte array representing the frame to set the chiller temperature.
     pub fn create_frame_chiller_set_temperature(
         &self,
-        address: u8,
+        transaction_id: u16,
+        unit_id: u8,
         temperature: u16,
-    ) -> [u8; BYTES_HOLDING_REGISTER] {
-        self.create_frame_write_single_register(
-            address,
+    ) -> [u8; BYTES_HOLDING_REGISTER_TCP] {
+        self.create_request_frame_tcp(
+            transaction_id,
+            unit_id,
+            CODE_WRITE_SINGLE_REGISTER,
             REGISTER_ADDRESS_CHILLER_TEMPERATURE_SETPOINT,
             temperature,
         )
-    }
-
-    /// Create a frame to write a single holding register.
-    ///
-    /// # Arguments
-    /// * `address` - The address of the device to communicate with.
-    /// * `register_address` - The address of the holding register to write.
-    /// * `value` - The value to write to the holding register.
-    ///
-    /// # Returns
-    /// A byte array representing the frame to write a single holding register.
-    fn create_frame_write_single_register(
-        &self,
-        address: u8,
-        register_address: u16,
-        value: u16,
-    ) -> [u8; BYTES_HOLDING_REGISTER] {
-        let mut frame = [0; BYTES_HOLDING_REGISTER];
-        frame[0] = address;
-        frame[1] = CODE_WRITE_SINGLE_REGISTER;
-        frame[2..4].copy_from_slice(&register_address.to_be_bytes());
-        frame[4..6].copy_from_slice(&value.to_be_bytes());
-
-        calculate_modbus_crc_and_update_frame(&self._crc, &mut frame);
-
-        frame
     }
 
     /// Create a frame to read the pressure.
@@ -465,7 +496,7 @@ impl ModbusCommunicator {
         }
 
         let response = from_utf8(frame).ok()?;
-        let re = Regex::new(r"@(\d+)\s(\d+\.\d+)\s").ok()?;
+        let re = Regex::new(r"@(\d+)\s(-?\d+\.\d+)\s").ok()?;
         let captures = re.captures(response)?;
 
         let address = self.parse_capture(&captures, 1)?;
@@ -633,12 +664,12 @@ mod tests {
     fn test_create_frame_read_chiller_and_read() {
         let (communicator, mut plant) = create_communicator_and_plant();
 
-        let frame_request = communicator.create_frame_read_chiller(1);
+        let frame_request = communicator.create_frame_read_chiller(13, 1);
         let frame_response = plant.request_chiller(0, &frame_request).unwrap();
 
         let chiller = communicator.read_chiller_from_frame(&frame_response);
 
-        assert!(chiller.is_some());
+        assert_eq!(chiller.unwrap().transaction_id, 13);
     }
 
     #[test]
@@ -656,7 +687,7 @@ mod tests {
         let (communicator, mut plant) = create_communicator_and_plant();
 
         let temperature = 75;
-        let frame_request = communicator.create_frame_chiller_set_temperature(0, temperature);
+        let frame_request = communicator.create_frame_chiller_set_temperature(11, 0, temperature);
         let frame_response = plant.request_chiller(0, &frame_request).unwrap();
 
         assert_eq!(frame_response, frame_request);

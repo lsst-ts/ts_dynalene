@@ -113,7 +113,7 @@ impl PierFan {
         }
     }
 
-    /// Get the maximum speed from a Modbus frame.
+    /// Get the maximum speed from a Modbus RTU frame.
     ///
     /// # Arguments
     /// * `frame` - The Modbus frame containing the maximum speed data.
@@ -132,7 +132,7 @@ impl PierFan {
         Some(u16::from_be_bytes([frame[3], frame[4]]) as f32)
     }
 
-    /// Get the reference DC link voltage and current from a Modbus frame.
+    /// Get the reference DC link voltage and current from a Modbus RTU frame.
     ///
     /// # Arguments
     /// * `frame` - The Modbus frame containing the reference DC link voltage
@@ -164,7 +164,7 @@ impl PierFan {
         Some((voltage, current))
     }
 
-    /// Create a `PierFan` instance from a Modbus frame.
+    /// Create a `PierFan` instance from a Modbus RTU frame.
     ///
     /// # Arguments
     /// * `max_speed` - The maximum speed of the pier fan in rpm.
