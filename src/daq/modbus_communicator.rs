@@ -504,7 +504,11 @@ impl ModbusCommunicator {
         }
 
         let response = from_utf8(frame).ok()?;
-        let re = Regex::new(r"C\d+=(\d+\.\d+)").ok()?;
+
+        // TODO: After we know the format of temperature values representing
+        // the NaN/plus or minus infinity, we need to update the regex
+        // accordingly.
+        let re = Regex::new(r"C\d+=(-?\d+\.\d+)").ok()?;
 
         let mut temperatures = [0.0; NUM_TEMPERATURE_CHANNEL];
         for (idx, captures) in re
@@ -687,14 +691,22 @@ mod tests {
 
     #[test]
     fn test_read_temperature_from_frame() {
-        let (communicator, plant) = create_communicator_and_plant();
+        let (communicator, mut plant) = create_communicator_and_plant();
+
+        // Positive temperatures.
+        let frame_response = plant.request_sensor_temperatures(0);
+        let temperatures = communicator.read_temperature_from_frame(&frame_response.unwrap());
+
+        let mut temperatures_expected = [PLANT_TEMPERATURE; NUM_TEMPERATURE_CHANNEL];
+        assert_eq!(temperatures.unwrap(), temperatures_expected);
+
+        // Negative temperatures.
+        temperatures_expected[3..5].fill(-PLANT_TEMPERATURE);
+        plant.set_sensor_temperatures(0, &temperatures_expected);
 
         let frame_response = plant.request_sensor_temperatures(0);
         let temperatures = communicator.read_temperature_from_frame(&frame_response.unwrap());
 
-        assert_eq!(
-            temperatures.unwrap(),
-            [PLANT_TEMPERATURE; NUM_TEMPERATURE_CHANNEL]
-        );
+        assert_eq!(temperatures.unwrap(), temperatures_expected);
     }
 }
