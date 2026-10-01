@@ -8,3 +8,5 @@ ts_control_utils = { git = "https://github.com/lsst-ts/ts_control_utils.git", br
 crc = "3.4.0"
 approx = "0.5.1"
 strum_macros = "0.28.0"
+strum = "0.28.0"
+regex = "1.13.1"

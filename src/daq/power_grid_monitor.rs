@@ -69,7 +69,7 @@ impl PowerGridMonitor {
         }
     }
 
-    /// Create a `PowerGridMonitor` instance from a Modbus frame.
+    /// Create a `PowerGridMonitor` instance from a Modbus RTU frame.
     ///
     /// # Arguments
     /// * `frame` - The Modbus frame containing the power grid monitor data.

@@ -62,7 +62,7 @@ impl Flowmeter {
         }
     }
 
-    /// Create a `Flowmeter` instance from a Modbus frame.
+    /// Create a `Flowmeter` instance from a Modbus RTU frame.
     ///
     /// # Arguments
     /// * `frame` - The Modbus frame containing the flowmeter data.

@@ -21,17 +21,24 @@
 
 use std::collections::HashMap;
 use std::str::from_utf8;
+use ts_control_utils::enums::BitEnum;
 
 use crate::config::Config;
 use crate::constants::{
-    CODE_READ_HOLDING_REGISTERS, CODE_WRITE_SINGLE_REGISTER, NUM_TEMPERATURE_CHANNEL,
-    NUM_TEMPERATURE_HUB, REGISTER_ADDRESS_PIER_FAN_RESET,
+    BYTES_HOLDING_REGISTER_RTU, BYTES_HOLDING_REGISTER_TCP, CODE_READ_HOLDING_REGISTERS,
+    CODE_WRITE_SINGLE_REGISTER, NUM_TEMPERATURE_CHANNEL, NUM_TEMPERATURE_HUB,
+    REGISTER_ADDRESS_CHILLER_TEMPERATURE_SETPOINT, REGISTER_ADDRESS_PIER_FAN_RESET,
 };
+use crate::enums::{AnalogInput, AnalogOutput, DigitalInputMod4, DigitalInputMod7, DigitalOutput};
 use crate::mock::{
-    mock_flowmeter_group::MockFlowmeterGroup, mock_pier_fan::MockPierFan,
+    mock_chiller::MockChiller,
+    mock_constants::{PLANT_NUM_CHANNEL_ANALOG_INPUT_OUTPUT, PLANT_TANK_LEVEL_VOLTAGE},
+    mock_flowmeter_group::MockFlowmeterGroup,
+    mock_pier_fan::MockPierFan,
     mock_power_grid_monitor::MockPowerGridMonitor,
     mock_pressure_transducer_group::MockPressureTransducerGroup,
-    mock_recirculation_pump::MockRecirculationPump, mock_temperature_hub::MockTemperatureHub,
+    mock_recirculation_pump::MockRecirculationPump,
+    mock_temperature_hub::MockTemperatureHub,
 };
 use crate::utility::get_index_from_array;
 
@@ -50,6 +57,23 @@ pub struct MockPlant {
     _pier_fans: Vec<MockPierFan>,
     // Recirculation pumps.
     _recirculation_pumps: Vec<MockRecirculationPump>,
+    // Chillers.
+    _chillers: Vec<MockChiller>,
+    // Digital inputs from Mod4, NI-9425. Each bit is defined in
+    // `DigitalInputMod4` in enums.rs.
+    pub digital_inputs_mod4: u32,
+    // Analog inputs from Mod5, NI-9207. See the `AnalogInput` in enums.rs for
+    // details.
+    _analog_inputs: Vec<f64>,
+    // Digital outputs to Mod6, NI-9476. Each bit is defined in
+    // `DigitalOutput` in enums.rs.
+    pub digital_outputs: u32,
+    // Digital inputs from Mod7, NI-9425. Each bit is defined in
+    // `DigitalInputMod7` in enums.rs.
+    pub digital_inputs_mod7: u32,
+    // Analog outputs to Mod8, NI-9264. See the `AnalogOutput` in enums.rs for
+    // details.
+    _analog_outputs: Vec<f64>,
 }
 
 impl Default for MockPlant {
@@ -94,9 +118,48 @@ impl MockPlant {
                 .iter()
                 .map(|address| MockRecirculationPump::new(*address))
                 .collect(),
+            _chillers: addresses["chiller"]
+                .iter()
+                .map(|address| MockChiller::new(*address))
+                .collect(),
 
             _addresses: addresses,
+
+            digital_inputs_mod4: Self::get_default_digital_inputs_mod4(),
+            digital_inputs_mod7: 0,
+
+            digital_outputs: 0,
+
+            _analog_inputs: Self::get_default_analog_inputs(),
+            _analog_outputs: vec![0.0; PLANT_NUM_CHANNEL_ANALOG_INPUT_OUTPUT],
         }
+    }
+
+    /// Get the default digital inputs for mod4.
+    ///
+    /// # Returns
+    /// Default digital inputs.
+    fn get_default_digital_inputs_mod4() -> u32 {
+        let bits = [
+            DigitalInputMod4::CloseFeedbackMov1,
+            DigitalInputMod4::CloseFeedbackMov2,
+            DigitalInputMod4::CloseFeedbackMov3,
+            DigitalInputMod4::CloseFeedbackMov4,
+            DigitalInputMod4::CloseFeedbackMov5,
+        ];
+        bits.iter().fold(0, |acc, x| acc | x.bit_value())
+    }
+
+    /// Get the default analog inputs for the mock plant.
+    ///
+    /// # Returns
+    /// A vector containing the default analog input values.
+    fn get_default_analog_inputs() -> Vec<f64> {
+        let mut analog_inputs = vec![0.0; PLANT_NUM_CHANNEL_ANALOG_INPUT_OUTPUT];
+        analog_inputs[AnalogInput::ReadoutTank1 as usize] = PLANT_TANK_LEVEL_VOLTAGE;
+        analog_inputs[AnalogInput::ReadoutTank2 as usize] = PLANT_TANK_LEVEL_VOLTAGE;
+
+        analog_inputs
     }
 
     /// Set the sensor of temperatures in the mock plant.
@@ -202,7 +265,7 @@ impl MockPlant {
     /// Payload containing the flowmeter measurement if the idx and command are
     /// valid. Otherwise, `None` is returned.
     pub fn request_sensor_flowmeter(&self, idx: usize, command: &[u8]) -> Option<Vec<u8>> {
-        if let Some((address, num_registers)) = self.get_address_and_num_registers(command) {
+        if let Some((address, num_registers)) = self.get_address_and_num_registers_rtu(command) {
             match idx {
                 0 => {
                     let idx_sensor =
@@ -230,7 +293,7 @@ impl MockPlant {
     }
 
     /// Get the address and number of registers from the command of reading
-    /// holding registers.
+    /// holding registers for the Modbus RTU protocol.
     ///
     /// # Arguments
     /// * `command` - The command to extract the address and number of
@@ -238,9 +301,8 @@ impl MockPlant {
     ///
     /// # Returns
     /// A tuple containing the address and the number of registers.
-    fn get_address_and_num_registers(&self, command: &[u8]) -> Option<(u8, u16)> {
-        // Bytes of the command should be 8.
-        if command.len() != 8 {
+    fn get_address_and_num_registers_rtu(&self, command: &[u8]) -> Option<(u8, u16)> {
+        if command.len() != BYTES_HOLDING_REGISTER_RTU {
             return None;
         }
 
@@ -256,7 +318,7 @@ impl MockPlant {
     /// Payload containing the power grid monitor measurement if the command is
     /// valid. Otherwise, `None` is returned.
     pub fn request_power_grid_monitor(&self, command: &[u8]) -> Option<Vec<u8>> {
-        if let Some((address, num_registers)) = self.get_address_and_num_registers(command) {
+        if let Some((address, num_registers)) = self.get_address_and_num_registers_rtu(command) {
             let idx = get_index_from_array(&self._addresses["power_grid_monitor"], &address)?;
 
             Some(self._sensor_power_grid_monitors[idx].request(num_registers))
@@ -275,7 +337,7 @@ impl MockPlant {
     /// Payload containing the pier fan measurement or reset response if the
     /// command is valid. Otherwise, `None` is returned.
     pub fn request_pier_fan(&mut self, command: &[u8]) -> Option<Vec<u8>> {
-        if let Some((address, num_registers)) = self.get_address_and_num_registers(command) {
+        if let Some((address, num_registers)) = self.get_address_and_num_registers_rtu(command) {
             let idx = get_index_from_array(&self._addresses["pier_fan"], &address)?;
             let function_code = command[1];
             let register_address = u16::from_be_bytes([command[2], command[3]]);
@@ -308,7 +370,7 @@ impl MockPlant {
     /// Payload containing the recirculation pump data if the command is valid.
     /// Otherwise, `None` is returned.
     pub fn request_recirculation_pump(&mut self, command: &[u8]) -> Option<Vec<u8>> {
-        if let Some((address, num_registers)) = self.get_address_and_num_registers(command) {
+        if let Some((address, num_registers)) = self.get_address_and_num_registers_rtu(command) {
             let idx = get_index_from_array(&self._addresses["recirculation_pump"], &address)?;
             let register_address = u16::from_be_bytes([command[2], command[3]]);
 
@@ -316,6 +378,231 @@ impl MockPlant {
         } else {
             None
         }
+    }
+
+    /// Request the chiller measurement or change the setpoint.
+    ///
+    /// # Arguments
+    /// * `idx` - The index of the chiller to request. Note that two chillers
+    ///   have the same address because they are under the different TCP
+    ///   connections. Therefore, we need specify the index to distinguish
+    ///   them. The value should be 0 or 1.
+    /// * `command` - The command to read the chiller measurement or change the
+    ///   setpoint.
+    ///
+    /// # Returns
+    /// Payload containing the chiller measurement or change the setpoint
+    /// response if the command is valid. Otherwise, `None` is returned.
+    pub fn request_chiller(&mut self, idx: usize, command: &[u8]) -> Option<Vec<u8>> {
+        if let Some(num_registers_or_value) = self.get_num_registers_or_value_tcp(command) {
+            let function_code = command[7];
+            let register_address = u16::from_be_bytes([command[8], command[9]]);
+            match function_code {
+                CODE_READ_HOLDING_REGISTERS => {
+                    let response = self._chillers[idx].request(num_registers_or_value);
+                    let response_length = response.len();
+
+                    let mut response_with_header = vec![0; 6 + response_length];
+                    response_with_header[0..4].copy_from_slice(&command[..4]);
+                    response_with_header[4..6]
+                        .copy_from_slice(&(response_length as u16).to_be_bytes());
+                    response_with_header[6..(6 + response_length)].copy_from_slice(&response);
+
+                    Some(response_with_header)
+                }
+                CODE_WRITE_SINGLE_REGISTER => {
+                    if register_address == REGISTER_ADDRESS_CHILLER_TEMPERATURE_SETPOINT {
+                        self._chillers[idx].set_temperature(num_registers_or_value);
+                        // Echo the command back as the response.
+                        Some(command.to_vec())
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            }
+        } else {
+            None
+        }
+    }
+
+    /// Get the number of registers or value from the command of reading
+    /// holding registers or writing single register for the Modbus TCP
+    /// protocol.
+    ///
+    /// # Arguments
+    /// * `command` - The command to extract the number of registers or value
+    ///   from.
+    ///
+    /// # Returns
+    /// Number of registers or value if the command is valid. Otherwise, `None`
+    /// is returned.
+    fn get_num_registers_or_value_tcp(&self, command: &[u8]) -> Option<u16> {
+        if command.len() != BYTES_HOLDING_REGISTER_TCP {
+            return None;
+        }
+
+        Some(u16::from_be_bytes([command[10], command[11]]))
+    }
+
+    /// Switch the specified digital output on or off.
+    ///
+    /// # Arguments
+    /// * `digital_output` - The digital output to switch.
+    /// * `switch_on` - `true` to switch on, `false` to switch off.
+    pub fn switch_digital_output(&mut self, digital_output: DigitalOutput, switch_on: bool) {
+        if switch_on {
+            self.digital_outputs |= digital_output.bit_value();
+        } else {
+            self.digital_outputs &= !digital_output.bit_value();
+        }
+
+        self.update_digital_inputs(digital_output, switch_on);
+    }
+
+    /// Update the digital inputs based on the state of the specified digital
+    /// output.
+    ///
+    /// # Arguments
+    /// * `digital_output` - The digital output to switch.
+    /// * `switch_on` - `true` to switch on, `false` to switch off.
+    fn update_digital_inputs(&mut self, digital_output: DigitalOutput, switch_on: bool) {
+        match digital_output {
+            DigitalOutput::OpenMov1 => {
+                if switch_on {
+                    self.digital_inputs_mod4 |= DigitalInputMod4::OpenFeedbackMov1.bit_value();
+                    self.digital_inputs_mod4 &= !DigitalInputMod4::CloseFeedbackMov1.bit_value();
+                } else {
+                    self.digital_inputs_mod4 &= !DigitalInputMod4::OpenFeedbackMov1.bit_value();
+                    self.digital_inputs_mod4 |= DigitalInputMod4::CloseFeedbackMov1.bit_value();
+                }
+            }
+            DigitalOutput::OpenMov2 => {
+                if switch_on {
+                    self.digital_inputs_mod4 |= DigitalInputMod4::OpenFeedbackMov2.bit_value();
+                    self.digital_inputs_mod4 &= !DigitalInputMod4::CloseFeedbackMov2.bit_value();
+                } else {
+                    self.digital_inputs_mod4 &= !DigitalInputMod4::OpenFeedbackMov2.bit_value();
+                    self.digital_inputs_mod4 |= DigitalInputMod4::CloseFeedbackMov2.bit_value();
+                }
+            }
+            DigitalOutput::OpenMov3 => {
+                if switch_on {
+                    self.digital_inputs_mod4 |= DigitalInputMod4::OpenFeedbackMov3.bit_value();
+                    self.digital_inputs_mod4 &= !DigitalInputMod4::CloseFeedbackMov3.bit_value();
+                } else {
+                    self.digital_inputs_mod4 &= !DigitalInputMod4::OpenFeedbackMov3.bit_value();
+                    self.digital_inputs_mod4 |= DigitalInputMod4::CloseFeedbackMov3.bit_value();
+                }
+            }
+            DigitalOutput::OpenMov4 => {
+                if switch_on {
+                    self.digital_inputs_mod4 |= DigitalInputMod4::OpenFeedbackMov4.bit_value();
+                    self.digital_inputs_mod4 &= !DigitalInputMod4::CloseFeedbackMov4.bit_value();
+                } else {
+                    self.digital_inputs_mod4 &= !DigitalInputMod4::OpenFeedbackMov4.bit_value();
+                    self.digital_inputs_mod4 |= DigitalInputMod4::CloseFeedbackMov4.bit_value();
+                }
+            }
+            DigitalOutput::OpenMov5 => {
+                if switch_on {
+                    self.digital_inputs_mod4 |= DigitalInputMod4::OpenFeedbackMov5.bit_value();
+                    self.digital_inputs_mod4 &= !DigitalInputMod4::CloseFeedbackMov5.bit_value();
+                } else {
+                    self.digital_inputs_mod4 &= !DigitalInputMod4::OpenFeedbackMov5.bit_value();
+                    self.digital_inputs_mod4 |= DigitalInputMod4::CloseFeedbackMov5.bit_value();
+                }
+            }
+            DigitalOutput::PowerRecirculationPump1 => {
+                if switch_on {
+                    self.digital_inputs_mod4 |= DigitalInputMod4::StatusK1.bit_value();
+                } else {
+                    self.digital_inputs_mod4 &= !DigitalInputMod4::StatusK1.bit_value();
+                }
+            }
+
+            DigitalOutput::PowerRecirculationPump2 => {
+                if switch_on {
+                    self.digital_inputs_mod4 |= DigitalInputMod4::StatusK2.bit_value();
+                } else {
+                    self.digital_inputs_mod4 &= !DigitalInputMod4::StatusK2.bit_value();
+                }
+            }
+
+            DigitalOutput::PowerPierFan1 => {
+                if switch_on {
+                    self.digital_inputs_mod7 |= DigitalInputMod7::StatusK3.bit_value();
+                } else {
+                    self.digital_inputs_mod7 &= !DigitalInputMod7::StatusK3.bit_value();
+                }
+            }
+
+            DigitalOutput::PowerPierFan2 => {
+                if switch_on {
+                    self.digital_inputs_mod7 |= DigitalInputMod7::StatusK4.bit_value();
+                } else {
+                    self.digital_inputs_mod7 &= !DigitalInputMod7::StatusK4.bit_value();
+                }
+            }
+
+            DigitalOutput::PowerChiller1 => {
+                if switch_on {
+                    self.digital_inputs_mod4 |= DigitalInputMod4::StatusK21.bit_value();
+                } else {
+                    self.digital_inputs_mod4 &= !DigitalInputMod4::StatusK21.bit_value();
+                }
+            }
+
+            DigitalOutput::PowerChiller2 => {
+                if switch_on {
+                    self.digital_inputs_mod4 |= DigitalInputMod4::StatusK22.bit_value();
+                } else {
+                    self.digital_inputs_mod4 &= !DigitalInputMod4::StatusK22.bit_value();
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Write a value to the specified analog output.
+    ///
+    /// # Arguments
+    /// * `analog_output` - The analog output to write to.
+    /// * `value` - The value to write.
+    pub fn write_analog_output(&mut self, analog_output: AnalogOutput, value: f64) {
+        self._analog_outputs[analog_output as usize] = value;
+
+        match analog_output {
+            AnalogOutput::CommandValuePcv1 => {
+                self._analog_inputs[AnalogInput::ReadoutPcv1 as usize] = value;
+            }
+            AnalogOutput::CommandValuePcv2 => {
+                self._analog_inputs[AnalogInput::ReadoutPcv2 as usize] = value;
+            }
+            AnalogOutput::CommandValueCmv1 => {
+                self._analog_inputs[AnalogInput::ReadoutCmv1 as usize] = value;
+            }
+            AnalogOutput::CommandValueCmv2 => {
+                self._analog_inputs[AnalogInput::ReadoutCmv2 as usize] = value;
+            }
+            AnalogOutput::CommandValueCmv20 => {
+                self._analog_inputs[AnalogInput::ReadoutCmv20 as usize] = value;
+            }
+            _ => {
+                // Do nothing for the mock plant.
+            }
+        }
+    }
+
+    /// Read the value of the specified analog input.
+    ///
+    /// # Arguments
+    /// * `analog_input` - The analog input to read from.
+    ///
+    /// # Returns
+    /// The value of the specified analog input.
+    pub fn read_analog_input(&self, analog_input: AnalogInput) -> f64 {
+        self._analog_inputs[analog_input as usize]
     }
 }
 
@@ -334,12 +621,12 @@ mod tests {
         recirculation_pump::RecirculationPump,
     };
 
-    fn create_frame_read_holding_registers(
+    fn create_frame_read_holding_registers_rtu(
         address: u8,
         register_address: u16,
         num_register: u16,
-    ) -> [u8; 8] {
-        let mut frame = [0; 8];
+    ) -> [u8; BYTES_HOLDING_REGISTER_RTU] {
+        let mut frame = [0; BYTES_HOLDING_REGISTER_RTU];
         frame[0] = address;
         frame[1] = CODE_READ_HOLDING_REGISTERS;
         frame[2..4].copy_from_slice(&register_address.to_be_bytes());
@@ -348,18 +635,63 @@ mod tests {
         frame
     }
 
-    fn create_frame_write_single_register(
+    fn create_frame_read_holding_registers_tcp(
+        transaction_id: u16,
+        address: u8,
+        register_address: u16,
+        num_register: u16,
+    ) -> [u8; BYTES_HOLDING_REGISTER_TCP] {
+        let mut frame = [0; BYTES_HOLDING_REGISTER_TCP];
+        frame[0..2].copy_from_slice(&transaction_id.to_be_bytes());
+        frame[6] = address;
+        frame[7] = CODE_READ_HOLDING_REGISTERS;
+        frame[8..10].copy_from_slice(&register_address.to_be_bytes());
+        frame[10..12].copy_from_slice(&num_register.to_be_bytes());
+        frame
+    }
+
+    fn create_frame_write_single_register_rtu(
         address: u8,
         register_address: u16,
         value: u16,
-    ) -> [u8; 8] {
-        let mut frame = [0; 8];
+    ) -> [u8; BYTES_HOLDING_REGISTER_RTU] {
+        let mut frame = [0; BYTES_HOLDING_REGISTER_RTU];
         frame[0] = address;
         frame[1] = CODE_WRITE_SINGLE_REGISTER;
         frame[2..4].copy_from_slice(&register_address.to_be_bytes());
         frame[4..6].copy_from_slice(&value.to_be_bytes());
         // CRC verify code is not calculated for the mock frame.
         frame
+    }
+
+    fn create_frame_write_single_register_tcp(
+        transaction_id: u16,
+        address: u8,
+        register_address: u16,
+        value: u16,
+    ) -> [u8; BYTES_HOLDING_REGISTER_TCP] {
+        let mut frame = [0; BYTES_HOLDING_REGISTER_TCP];
+        frame[0..2].copy_from_slice(&transaction_id.to_be_bytes());
+        frame[6] = address;
+        frame[7] = CODE_WRITE_SINGLE_REGISTER;
+        frame[8..10].copy_from_slice(&register_address.to_be_bytes());
+        frame[10..12].copy_from_slice(&value.to_be_bytes());
+        frame
+    }
+
+    #[test]
+    fn test_new() {
+        let plant = MockPlant::new();
+
+        assert_eq!(plant.digital_inputs_mod4, 682);
+        assert_eq!(
+            plant._analog_inputs[AnalogInput::ReadoutTank1 as usize],
+            PLANT_TANK_LEVEL_VOLTAGE
+        );
+        assert_eq!(
+            plant._analog_inputs[AnalogInput::ReadoutTank2 as usize],
+            PLANT_TANK_LEVEL_VOLTAGE
+        );
     }
 
     #[test]
@@ -459,7 +791,7 @@ mod tests {
         let plant = MockPlant::new();
 
         // Valid
-        let mut command = create_frame_read_holding_registers(
+        let mut command = create_frame_read_holding_registers_rtu(
             7,
             REGISTER_ADDRESS_FLOWMETER,
             NUM_REGISTER_FLOWMETER,
@@ -482,7 +814,7 @@ mod tests {
         let plant = MockPlant::new();
 
         // Valid
-        let mut command = create_frame_read_holding_registers(
+        let mut command = create_frame_read_holding_registers_rtu(
             2,
             REGISTER_ADDRESS_POWER_GRID_MONITOR,
             NUM_REGISTER_POWER_GRID_MONITOR,
@@ -499,12 +831,13 @@ mod tests {
     }
 
     #[test]
-    fn test_request_pier_fan_write_holding_registers() {
+    fn test_request_pier_fan_write_single_register() {
         let mut plant = MockPlant::new();
         plant._pier_fans[0].pier_fan.motor_status = 10;
         plant._pier_fans[0].pier_fan.warning = 10;
 
-        let command = create_frame_write_single_register(12, REGISTER_ADDRESS_PIER_FAN_RESET, 1);
+        let command =
+            create_frame_write_single_register_rtu(12, REGISTER_ADDRESS_PIER_FAN_RESET, 1);
 
         let response = plant.request_pier_fan(&command).unwrap();
 
@@ -520,7 +853,7 @@ mod tests {
 
         // Valid to read the holding registers
         let mut command =
-            create_frame_read_holding_registers(12, REGISTER_ADDRESS_PIER_FAN_MAXIMUM_SPEED, 1);
+            create_frame_read_holding_registers_rtu(12, REGISTER_ADDRESS_PIER_FAN_MAXIMUM_SPEED, 1);
 
         let response = plant.request_pier_fan(&command).unwrap();
 
@@ -537,7 +870,7 @@ mod tests {
         let mut plant = MockPlant::new();
 
         // Valid to read the holding registers
-        let command = create_frame_read_holding_registers(
+        let command = create_frame_read_holding_registers_rtu(
             1,
             REGISTER_ADDRESS_RECIRCULATION_PUMP_CIM_CONFIGURATION,
             NUM_REGISTER_RECIRCULATION_PUMP_CIM_CONFIGURATION,
@@ -554,5 +887,157 @@ mod tests {
                 .actual_modbus_address,
             1
         );
+    }
+
+    #[test]
+    fn test_request_chiller_write_single_register() {
+        let mut plant = MockPlant::new();
+
+        let command = create_frame_write_single_register_tcp(
+            10,
+            1,
+            REGISTER_ADDRESS_CHILLER_TEMPERATURE_SETPOINT,
+            13,
+        );
+        let response = plant.request_chiller(0, &command).unwrap();
+
+        assert_eq!(response, command);
+
+        assert_eq!(plant._chillers[0].chiller.temperature_setpoint, 13);
+    }
+
+    #[test]
+    fn test_request_chiller_read_holding_registers() {
+        let mut plant = MockPlant::new();
+
+        // Valid to read the holding registers
+        let mut command = create_frame_read_holding_registers_tcp(
+            9,
+            1,
+            REGISTER_ADDRESS_CHILLER_TEMPERATURE_SETPOINT,
+            1,
+        );
+
+        let response = plant.request_chiller(0, &command).unwrap();
+
+        assert_eq!(response.len(), 11);
+        assert_eq!(u16::from_be_bytes([response[4], response[5]]), 5);
+        assert_eq!(response[6], 1);
+
+        // Invalid function code
+        command[7] = 8;
+        assert!(plant.request_chiller(0, &command).is_none());
+    }
+
+    #[test]
+    fn test_switch_digital_output() {
+        let mut plant = MockPlant::new();
+
+        // First time to switch on the digital output
+        plant.switch_digital_output(DigitalOutput::OpenMov5, true);
+        assert_eq!(plant.digital_outputs, DigitalOutput::OpenMov5.bit_value());
+
+        // Switch the same digital output on again to ensure it remains on
+        plant.switch_digital_output(DigitalOutput::OpenMov5, true);
+        assert_eq!(plant.digital_outputs, DigitalOutput::OpenMov5.bit_value());
+
+        // Switch on another digital output to ensure multiple outputs can be
+        // on simultaneously
+        plant.switch_digital_output(DigitalOutput::PowerPierFan1, true);
+        assert_eq!(
+            plant.digital_outputs,
+            DigitalOutput::OpenMov5.bit_value() + DigitalOutput::PowerPierFan1.bit_value()
+        );
+        assert!(plant.digital_inputs_mod7 & DigitalInputMod7::StatusK3.bit_value() != 0);
+
+        // Switch off the first digital output to ensure it is turned off
+        // correctly
+        plant.switch_digital_output(DigitalOutput::OpenMov5, false);
+        assert_eq!(
+            plant.digital_outputs,
+            DigitalOutput::PowerPierFan1.bit_value()
+        );
+
+        // Switch off a digital output that is already off to ensure no change
+        // occurs
+        plant.switch_digital_output(DigitalOutput::OpenMov5, false);
+        assert_eq!(
+            plant.digital_outputs,
+            DigitalOutput::PowerPierFan1.bit_value()
+        );
+
+        // Switch off the last remaining digital output to ensure all outputs
+        // are off
+        plant.switch_digital_output(DigitalOutput::PowerPierFan1, false);
+        assert_eq!(plant.digital_outputs, 0);
+        assert!(plant.digital_inputs_mod7 & DigitalInputMod7::StatusK3.bit_value() == 0);
+    }
+
+    #[test]
+    fn test_update_digital_inputs() {
+        let mut plant = MockPlant::new();
+
+        plant.update_digital_inputs(DigitalOutput::PowerRecirculationPump1, true);
+        assert!(plant.digital_inputs_mod4 & DigitalInputMod4::StatusK1.bit_value() != 0);
+
+        plant.update_digital_inputs(DigitalOutput::PowerRecirculationPump1, false);
+        assert!(plant.digital_inputs_mod4 & DigitalInputMod4::StatusK1.bit_value() == 0);
+
+        plant.update_digital_inputs(DigitalOutput::PowerRecirculationPump2, true);
+        assert!(plant.digital_inputs_mod4 & DigitalInputMod4::StatusK2.bit_value() != 0);
+
+        plant.update_digital_inputs(DigitalOutput::PowerRecirculationPump2, false);
+        assert!(plant.digital_inputs_mod4 & DigitalInputMod4::StatusK2.bit_value() == 0);
+
+        plant.update_digital_inputs(DigitalOutput::PowerPierFan1, true);
+        assert!(plant.digital_inputs_mod7 & DigitalInputMod7::StatusK3.bit_value() != 0);
+
+        plant.update_digital_inputs(DigitalOutput::PowerPierFan1, false);
+        assert!(plant.digital_inputs_mod7 & DigitalInputMod7::StatusK3.bit_value() == 0);
+
+        plant.update_digital_inputs(DigitalOutput::PowerPierFan2, true);
+        assert!(plant.digital_inputs_mod7 & DigitalInputMod7::StatusK4.bit_value() != 0);
+
+        plant.update_digital_inputs(DigitalOutput::PowerPierFan2, false);
+        assert!(plant.digital_inputs_mod7 & DigitalInputMod7::StatusK4.bit_value() == 0);
+
+        plant.update_digital_inputs(DigitalOutput::PowerChiller1, true);
+        assert!(plant.digital_inputs_mod4 & DigitalInputMod4::StatusK21.bit_value() != 0);
+
+        plant.update_digital_inputs(DigitalOutput::PowerChiller1, false);
+        assert!(plant.digital_inputs_mod4 & DigitalInputMod4::StatusK21.bit_value() == 0);
+
+        plant.update_digital_inputs(DigitalOutput::PowerChiller2, true);
+        assert!(plant.digital_inputs_mod4 & DigitalInputMod4::StatusK22.bit_value() != 0);
+
+        plant.update_digital_inputs(DigitalOutput::PowerChiller2, false);
+        assert!(plant.digital_inputs_mod4 & DigitalInputMod4::StatusK22.bit_value() == 0);
+    }
+
+    #[test]
+    fn test_write_analog_output() {
+        let mut plant = MockPlant::new();
+
+        let value = 55.0;
+        plant.write_analog_output(AnalogOutput::CommandValueCmv2, value);
+
+        assert_eq!(
+            plant._analog_outputs[AnalogOutput::CommandValueCmv2 as usize],
+            value
+        );
+        assert_eq!(
+            plant._analog_inputs[AnalogInput::ReadoutCmv2 as usize],
+            value
+        );
+    }
+
+    #[test]
+    fn test_read_analog_input() {
+        let mut plant = MockPlant::new();
+
+        let value = 42.0;
+        plant._analog_inputs[AnalogInput::ReadoutPcv1 as usize] = value;
+
+        assert_eq!(plant.read_analog_input(AnalogInput::ReadoutPcv1), value);
     }
 }

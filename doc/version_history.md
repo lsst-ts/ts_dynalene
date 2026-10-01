@@ -1,5 +1,17 @@
 # Version History
 
+0.1.4
+
+- Add the dependency of `strum` and `regex`.
+- Add the **BYTES_HOLDING_REGISTER** and **MAX_ANALOG_INPUT_OUTPUT** to `constants.rs.`.
+- Add the chiller and tank level sensor settings to `parameters_app.yaml` and update the **Config**.
+- Add the **Chiller**, **MockChiller**, **ModbusCommunicator**, **TankLevel**, and **DataAcquisition** classes.
+- Add the **PLANT_TANK_LEVEL_VOLTAGE** and **PLANT_NUM_CHANNEL_ANALOG_INPUT_OUTPUT** to `mock_constants.rs`.
+- Add the digital/analog input/output enums to `enums.rs`.
+- Update the **MockPlant** class and **PierFan** class.
+- Update the class diagram.
+- Update the **README.md**.
+
 0.1.3
 
 - Use the `rubincr.lsst.org` for docker image in `Jenkinsfile`.

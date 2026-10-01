@@ -324,7 +324,7 @@ impl RecirculationPump {
     }
 
     /// Create a `RecirculationPumpCimConfiguration` instance from a Modbus
-    /// frame.
+    /// RTU frame.
     ///
     /// # Arguments
     /// * `frame` - The Modbus frame containing the recirculation pump CIM
@@ -437,7 +437,7 @@ impl RecirculationPump {
         })
     }
 
-    /// Create a `RecirculationPumpControl` instance from a Modbus frame.
+    /// Create a `RecirculationPumpControl` instance from a Modbus RTU frame.
     ///
     /// # Arguments
     /// * `frame` - The Modbus frame containing the recirculation pump control.
@@ -478,7 +478,7 @@ impl RecirculationPump {
         })
     }
 
-    /// Create a `RecirculationPumpStatus` instance from a Modbus frame.
+    /// Create a `RecirculationPumpStatus` instance from a Modbus RTU frame.
     ///
     /// # Arguments
     /// * `frame` - The Modbus frame containing the recirculation pump status.
@@ -531,7 +531,7 @@ impl RecirculationPump {
         })
     }
 
-    /// Create a `RecirculationPumpData` instance from a Modbus frame.
+    /// Create a `RecirculationPumpData` instance from a Modbus RTU frame.
     ///
     /// # Arguments
     /// * `frame` - The Modbus frame containing the recirculation pump data.

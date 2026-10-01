@@ -19,7 +19,11 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+pub mod chiller;
+pub mod data_acquisition;
 pub mod flowmeter;
+pub mod modbus_communicator;
 pub mod pier_fan;
 pub mod power_grid_monitor;
 pub mod recirculation_pump;
+pub mod tank_level;

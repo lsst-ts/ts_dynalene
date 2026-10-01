@@ -31,6 +31,12 @@ You can download the [user guide](https://productinfo.se.com/pm5500/595e2aa946e0
 You need to [register the account](https://www.ebmpapst.com/us/en/support/downloads/modbus-ebmbus.html) and request the Modbus document to get the Modbus protocol.
 - Recirculation pump: [Grundfos CRE 10-5 K-FJ-A-E-HQQE](https://product-selection.grundfos.com/products/cr-cre-cri-crie-crn-crne-crt-crte/cre/cre-10-5-99241450?pumpsystemid=3051387793&tab=variant-curves) is used.
 You can get the [Modbus document](https://api.grundfos.com/literature/Grundfosliterature-6012947.pdf) to know the protocol details.
+- Chiller: [Titan central water chillers TI-25WDX-MZCD-4PX](https://www.advantageengineering.com/centralChillers/titan_central_chillers.php) is used.
+You can get the [Modbus document](https://www.advantageengineering.com/fyi/325/advantageFYI325.php) to know the product details (see Multizone III).
+- Motor operated valve (MOV): [Valworx electric actuated ball valves series 5660](https://www.valworx.com/category/specialty/low-emission-valves/low-emission-electric-flanged-ball-valves-on-off) and [Valworx on-off electric actuators series 5618](https://www.valworx.com/category/actuators/electric-valve-actuators-and-accessories/5618-series-electric-actuators) are used.
+- Pressure control valve (PCV): [Flowrite 599 series two-way valve](https://sid.siemens.com/api/khub/documents/Nx_ctfvHx7FSg_FyBxw4cw/content) and [Flowrite 599 series SKD6xU electronic valve actuators](https://files.kempstoncontrols.com/files/c146dc2d97fc179dff6ccdacf21c56d0/SKD62U.aspx) are used.
+- Control mixing valve (CMV): [VG7000 series bronze control valves](https://docs.johnsoncontrols.com/bas/api/khub/documents/b4kd9r2b5J8VoEiIEadmuQ/content) and [VA7820-HGx-2 / VA7830-HGx-2 electric valve actuators](https://docs.johnsoncontrols.com/bas/v/u/Johnson-Controls/en-US/VA7820-HGx-2/VA7830-HGx-2-Electric-Valve-Actuators-Spring-Return-Models-Installation-Guide/A) are used.
+- Ultrasonic sensor for the tank level: [Omega U-series ultrasonic sensors](https://assets.dwyeromega.com/manuals/USR03-Series_manual.pdf) are used.
 
 ## Development Environment
 

@@ -28,6 +28,12 @@ use ts_control_utils::utility::get_parameter_array;
 pub struct Config {
     // Addresses for various devices on different buses.
     pub addresses: HashMap<String, Vec<u8>>,
+    // IPs for the chillers.
+    pub ips_chiller: Vec<String>,
+    // Ports for the chillers.
+    pub ports_chiller: Vec<i32>,
+    // Tank levels.
+    pub tank_levels: HashMap<String, Vec<f64>>,
 }
 
 impl Config {
@@ -38,7 +44,12 @@ impl Config {
     pub fn new() -> Self {
         let filepath = Path::new("config/parameters_app.yaml");
         Self {
-            addresses: Config::read_addresses(filepath),
+            addresses: Self::read_addresses(filepath),
+
+            ips_chiller: get_parameter_array(filepath, "ips_chiller"),
+            ports_chiller: get_parameter_array(filepath, "ports_chiller"),
+
+            tank_levels: Self::read_tank_levels(filepath),
         }
     }
 
@@ -92,7 +103,37 @@ impl Config {
             get_parameter_array(filepath, "addresses_recirculation_pump"),
         );
 
+        addresses.insert(
+            "chiller".to_string(),
+            get_parameter_array(filepath, "addresses_chiller"),
+        );
+
         addresses
+    }
+
+    /// Read the tank levels from the configuration file.
+    ///
+    /// # Arguments
+    /// * `filepath` - Path to the configuration file.
+    ///
+    /// # Returns
+    /// A HashMap containing tank level parameters.
+    fn read_tank_levels(filepath: &Path) -> HashMap<String, Vec<f64>> {
+        let mut tank_levels = HashMap::new();
+        tank_levels.insert(
+            "sensor_max_range".to_string(),
+            get_parameter_array(filepath, "tank_level_sensor_max_range"),
+        );
+        tank_levels.insert(
+            "distance_full".to_string(),
+            get_parameter_array(filepath, "tank_level_distance_full"),
+        );
+        tank_levels.insert(
+            "distance_empty".to_string(),
+            get_parameter_array(filepath, "tank_level_distance_empty"),
+        );
+
+        tank_levels
     }
 }
 
@@ -101,9 +142,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_read_addresses() {
-        let addresses = Config::read_addresses(Path::new("config/parameters_app.yaml"));
+    fn test_new() {
+        let config = Config::new();
 
-        assert_eq!(addresses.len(), 9);
+        assert_eq!(config.addresses.len(), 10);
+        assert_eq!(config.ips_chiller.len(), 2);
+        assert_eq!(config.ports_chiller.len(), 2);
+        assert_eq!(config.tank_levels.len(), 3);
     }
 }
