@@ -22,7 +22,7 @@
 use crate::constants::NUM_REGISTER_FLOWMETER;
 use crate::utility::get_values_from_u8_array;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Flowmeter {
     // Address of the flowmeter.
     pub address: u8,

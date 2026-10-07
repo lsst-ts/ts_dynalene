@@ -26,7 +26,7 @@ use crate::constants::{
 };
 use crate::utility::get_values_from_u8_array;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct PierFan {
     // Address of the pier fan.
     pub address: u8,

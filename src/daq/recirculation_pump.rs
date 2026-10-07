@@ -29,7 +29,7 @@ use crate::enums::{
 };
 use crate::utility::get_values_from_u8_array;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct RecirculationPumpCimConfiguration {
     // The minimum reply delay from the slave in ms.
     // Value range: 0-10000, i.e. up to 10 seconds reply delay. This delay is
@@ -134,7 +134,7 @@ pub struct RecirculationPumpCimConfiguration {
     pub product_software_date: String,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct RecirculationPumpControl {
     // Control status that each bit is defined in
     // `ControlStatusRecirculationPump` in enums.rs.
@@ -181,7 +181,7 @@ pub struct RecirculationPumpControl {
     pub control_pump_1: u16,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct RecirculationPumpStatus {
     // Status that each bit is defined in `StatusRecirculationPump` in
     // enums.rs.
@@ -237,7 +237,7 @@ pub struct RecirculationPumpStatus {
     pub system_active_functions: u16,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct RecirculationPumpData {
     // Performance relative to maximum performance in percent.
     pub relative_performance: f32,
@@ -255,7 +255,7 @@ pub struct RecirculationPumpData {
     pub user_setpoint: f32,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct RecirculationPump {
     // Address of the recirculation pump.
     pub address: u8,
