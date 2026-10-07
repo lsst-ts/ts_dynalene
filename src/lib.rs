@@ -27,5 +27,6 @@ pub mod config;
 pub mod constants;
 pub mod daq;
 pub mod enums;
+pub mod event_queue;
 pub mod mock;
 pub mod utility;
