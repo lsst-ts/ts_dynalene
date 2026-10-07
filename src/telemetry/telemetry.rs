@@ -19,7 +19,38 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-#[allow(clippy::module_inception)]
-pub mod telemetry;
-pub mod telemetry_data_acquisition;
-pub mod telemetry_default;
+use serde_json::Value;
+
+use crate::telemetry::telemetry_data_acquisition::TelemetryDataAcquisition;
+
+pub struct Telemetry {
+    // Telemetry of the data acquisition system.
+    pub daq: Option<TelemetryDataAcquisition>,
+    // Command execution result.
+    pub command_result: Option<Value>,
+    // Events to publish.
+    pub events: Option<Vec<Value>>,
+}
+
+impl Telemetry {
+    /// Create a new telemetry object.
+    ///
+    /// # Arguments
+    /// * `daq` - Telemetry of the data acquisition system.
+    /// * `command_result` - Command execution result.
+    /// * `events` - Events to publish.
+    ///
+    /// # Returns
+    /// A new telemetry object.
+    pub fn new(
+        daq: Option<TelemetryDataAcquisition>,
+        command_result: Option<Value>,
+        events: Option<Vec<Value>>,
+    ) -> Self {
+        Self {
+            daq,
+            command_result,
+            events,
+        }
+    }
+}
