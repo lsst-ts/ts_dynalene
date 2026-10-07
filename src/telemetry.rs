@@ -20,5 +20,6 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 #[allow(clippy::module_inception)]
+pub mod telemetry;
 pub mod telemetry_data_acquisition;
 pub mod telemetry_default;
