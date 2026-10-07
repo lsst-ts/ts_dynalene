@@ -63,7 +63,17 @@ pub const NUM_TEMPERATURE_CHANNEL: usize = 8;
 
 pub const NUM_BUS_PRESSURE_TRANSDUCER: usize = 3;
 
+// Numbers of the pressure transducers for each bus. This should be consistent
+// with the "parameters_app.yaml".
+pub const NUMS_PRESSURE_TRANSDUCER: [usize; NUM_BUS_PRESSURE_TRANSDUCER] = [16, 2, 2];
+
 pub const OFFSET_READ_HOLDING_REGISTERS_FLOWMETER: u16 = 40001;
+
+pub const NUM_BUS_FLOWMETER: usize = 3;
+
+// Numbers of the flowmeters for each bus. This should be consistent with the
+// "parameters_app.yaml".
+pub const NUMS_FLOWMETER: [usize; NUM_BUS_FLOWMETER] = [4, 4, 4];
 
 // Register address of the flowmeter relative to the offset of holding
 // registers. 40700 (Signal Strength) is used for Big-endian word order master
@@ -174,3 +184,12 @@ pub const BYTES_HOLDING_REGISTER_TCP: usize = 12;
 // Maximum value for the analog input/output in volts (Mod5, NI-9207;
 // Mod8, NI-9264).
 pub const MAX_ANALOG_INPUT_OUTPUT: f64 = 10.0;
+
+// Number of the pressure control valve (PCV).
+pub const NUM_PCV: usize = 2;
+
+// Number of the control mixing valve (CMV).
+pub const NUM_CMV: usize = 3;
+
+// Number of the tank.
+pub const NUM_TANK: usize = 2;
