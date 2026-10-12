@@ -3,6 +3,7 @@
 There are the following modules in the control system:
 
 - [daq](#daq)
+- [telemetry](#telemetry)
 - [mock](#mock)
 
 Show the main class diagram below:
@@ -11,6 +12,7 @@ Show the main class diagram below:
 classDiagram
 
 class Config
+class EventQueue
 ```
 
 ## Daq
@@ -22,15 +24,21 @@ classDiagram
 
 namespace main {
   class Config
+  class EventQueue
 }
+
+namespace telemetry {
+  class TelemetryDataAcquisition
+}
+
 namespace mock {
   class MockPlant
 }
 
-RecirculationPump *-- RecirculationPumpCimConfiguration
-RecirculationPump *-- RecirculationPumpControl
-RecirculationPump *-- RecirculationPumpStatus
-RecirculationPump *-- RecirculationPumpData
+RecirculationPump o-- RecirculationPumpCimConfiguration
+RecirculationPump o-- RecirculationPumpControl
+RecirculationPump o-- RecirculationPumpStatus
+RecirculationPump o-- RecirculationPumpData
 
 ModbusCommunicator ..> Flowmeter
 ModbusCommunicator ..> PowerGridMonitor
@@ -39,9 +47,46 @@ ModbusCommunicator ..> RecirculationPump
 ModbusCommunicator ..> Chiller
 
 DataAcquisition *-- Config
+DataAcquisition *-- EventQueue
+DataAcquisition *-- TelemetryDataAcquisition
 DataAcquisition "1" *-- "2" TankLevel
 DataAcquisition *-- ModbusCommunicator
 DataAcquisition o-- MockPlant
+```
+
+## Telemetry
+
+The [telemetry](../src/telemetry/) module supports the telemetry and event:
+
+```mermaid
+classDiagram
+
+namespace daq {
+  class Chiller
+  class Flowmeter
+  class PierFan
+  class PowerGridMonitor
+  class RecirculationPump
+  class RecirculationPumpCimConfiguration
+  class RecirculationPumpControl
+  class RecirculationPumpStatus
+  class RecirculationPumpData
+}
+
+RecirculationPump o-- RecirculationPumpCimConfiguration
+RecirculationPump o-- RecirculationPumpControl
+RecirculationPump o-- RecirculationPumpStatus
+RecirculationPump o-- RecirculationPumpData
+
+TelemetryDefault <|-- TelemetryDataAcquisition
+
+TelemetryDataAcquisition ..> Chiller
+TelemetryDataAcquisition ..> Flowmeter
+TelemetryDataAcquisition ..> PierFan
+TelemetryDataAcquisition ..> PowerGridMonitor
+TelemetryDataAcquisition ..> RecirculationPump
+
+Telemetry o-- TelemetryDataAcquisition
 ```
 
 ## Mock
