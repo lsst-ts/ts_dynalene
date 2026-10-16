@@ -24,7 +24,7 @@ use crate::constants::{
 };
 use crate::utility::get_values_from_u8_array;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct PowerGridMonitor {
     // Address of the power grid monitor.
     pub address: u8,

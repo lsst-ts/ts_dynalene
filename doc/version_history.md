@@ -1,5 +1,16 @@
 # Version History
 
+0.1.5
+
+- Add the dependencies of `serde`, `serde_json`, and `log`.
+- Derive the **Clone** to DAQ classes.
+- Support the **Default** in `recirculation_pump.rs`.
+- Update the `constants.rs.`
+- Update the `parameters_app.yaml`.
+- Add the **EventQueue**, **TelemetryDefault**, **TelemetryDataAcquisition**, and **Telemetry** classes.
+- Update the **DataAcquisition** class.
+- Update the class diagram.
+
 0.1.4
 
 - Add the dependency of `strum` and `regex`.

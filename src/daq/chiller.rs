@@ -22,7 +22,7 @@
 use crate::constants::NUM_REGISTER_CHILLER;
 use crate::utility::get_values_from_u8_array;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Chiller {
     // Transaction ID of the Modbus TCP communication.
     pub transaction_id: u16,
