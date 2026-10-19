@@ -1,5 +1,18 @@
 # Version History
 
+0.1.6
+
+- Add the **CommandStatus** and **Commander** to `enums.rs`.
+- Update the `constants.rs`.
+- Update the `parameters_app.yaml`.
+- Update the `utility.rs`.
+- Update the **Config**.
+- Update the **DataAcquisition**.
+- Add the **CommandSchema**, **CommandDataAcquisition**, **DataAcquisitionProcess**, and **Event**.
+- Copy and modify the **TelemetryServer**, **CommandServer**, and **CommandTelemetryServer** from the **ts_mtm2_controller**.
+- Add the `communication_protocol.md`.
+- Update the `class_diagram.md` and `README.md`.
+
 0.1.5
 
 - Add the dependencies of `serde`, `serde_json`, and `log`.
