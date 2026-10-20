@@ -2,6 +2,10 @@
 
 This is a multi-threaded application.
 
+## Communication Protocol
+
+See the [communication protocol](communication_protocol.md) for the communication details between the controller and client (EUI/CSC).
+
 ## Command Factory Pattern
 
 The [command factory pattern](../src/command/command_schema.rs) is applied in the system.
