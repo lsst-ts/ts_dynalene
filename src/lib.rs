@@ -29,6 +29,7 @@ pub mod constants;
 pub mod daq;
 pub mod enums;
 pub mod event_queue;
+pub mod interface;
 pub mod mock;
 pub mod telemetry;
 pub mod utility;
