@@ -145,7 +145,7 @@ impl DataAcquisitionProcess {
             // adjust the valves and others.
             let mut command_result = None;
             while let Ok(message) = self._receiver_to_daq.try_recv() {
-                command_result = self.execute_and_check_internal_command(&message);
+                command_result = self.execute_and_check_internal_command(message);
 
                 // Stop processing further messages if a command result is
                 // obtained. It should be an external command and we need to
@@ -199,11 +199,12 @@ impl DataAcquisitionProcess {
     ///
     /// # Returns
     /// The command result, or None if it's an internal command.
-    fn execute_and_check_internal_command(&mut self, message: &Value) -> Option<Value> {
+    fn execute_and_check_internal_command(&mut self, message: Value) -> Option<Value> {
+        let is_internal_command = get_message_sequence_id(&message) == -1;
+
         let result = self._command_schema.execute(message, Some(&mut self.daq));
 
         // For the internal command, no need to send the result.
-        let is_internal_command = get_message_sequence_id(message) == -1;
         if is_internal_command {
             None
         } else {
@@ -270,6 +271,7 @@ mod tests {
         for percentage in 0..=20 {
             let _ = sender_to_data_acquisition.try_send(json!({
                 "id": "cmd_openControlMixingValve",
+                "sequence_id": -1,
                 "parameters": {
                     "idx": 0,
                     "percentage": percentage as f64,
@@ -383,7 +385,7 @@ mod tests {
             },
         });
         let result_internal =
-            data_acquisition_process.execute_and_check_internal_command(&command_internal);
+            data_acquisition_process.execute_and_check_internal_command(command_internal);
 
         assert!(result_internal.is_none());
 
@@ -397,7 +399,7 @@ mod tests {
             },
         });
         let result_external =
-            data_acquisition_process.execute_and_check_internal_command(&command_external);
+            data_acquisition_process.execute_and_check_internal_command(command_external);
 
         assert_eq!(
             result_external.unwrap(),
