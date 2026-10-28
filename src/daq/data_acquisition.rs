@@ -138,7 +138,7 @@ impl DataAcquisition {
         &mut self,
         digital_output: DigitalOutput,
         switch_on: bool,
-    ) -> Result<(), &'static str> {
+    ) -> Result<(), String> {
         if let Some(plant) = &mut self.plant {
             plant.switch_digital_output(digital_output, switch_on);
 
@@ -163,9 +163,9 @@ impl DataAcquisition {
         &mut self,
         idx: usize,
         percentage: f64,
-    ) -> Result<(), &'static str> {
+    ) -> Result<(), String> {
         if !self.is_valid_percentage(percentage) {
-            return Err("Percentage is not in [0, 100].");
+            return Err(String::from("Percentage is not in [0, 100]."));
         }
 
         self.open_valve(
@@ -189,13 +189,9 @@ impl DataAcquisition {
     /// # Returns
     /// Ok if the valve is opened successfully. Otherwise, Err with a failure
     /// reason.
-    pub fn open_control_mixing_valve(
-        &mut self,
-        idx: usize,
-        percentage: f64,
-    ) -> Result<(), &'static str> {
+    pub fn open_control_mixing_valve(&mut self, idx: usize, percentage: f64) -> Result<(), String> {
         if !self.is_valid_percentage(percentage) {
-            return Err("Percentage is not in [0, 100].");
+            return Err(String::from("Percentage is not in [0, 100]."));
         }
 
         self.open_valve(
@@ -240,8 +236,10 @@ impl DataAcquisition {
         idx: usize,
         analog_outputs: &[AnalogOutput],
         percentage: f64,
-    ) -> Result<(), &'static str> {
-        let analog_output = analog_outputs.get(idx).ok_or("Invalid valve index.")?;
+    ) -> Result<(), String> {
+        let analog_output = analog_outputs
+            .get(idx)
+            .ok_or(String::from("Invalid valve index."))?;
         let value = percentage.clamp(0.0, 100.0) / 100.0 * MAX_ANALOG_INPUT_OUTPUT;
         if let Some(plant) = &mut self.plant {
             plant.write_analog_output(*analog_output, value);
@@ -263,10 +261,10 @@ impl DataAcquisition {
     ///
     /// # Panics
     /// Panics if not in simulation mode.
-    pub fn reset_pier_fan(&mut self, idx: usize) -> Result<(), &'static str> {
+    pub fn reset_pier_fan(&mut self, idx: usize) -> Result<(), String> {
         let address = *self.config.addresses["pier_fan"]
             .get(idx)
-            .ok_or("Invalid pier fan index.")?;
+            .ok_or(String::from("Invalid pier fan index."))?;
         if self.is_enabled_pier_fan(idx, self._latest_telemetry.digital_inputs_mod7) {
             let frame_request = self._modbus.create_frame_pier_fan_reset(address);
 
@@ -275,14 +273,16 @@ impl DataAcquisition {
                 if let Some(reading) = plant.request_pier_fan(&frame_request) {
                     frame_response = reading;
                 } else {
-                    return Err("Pier fan request failed.");
+                    return Err(String::from("Pier fan request failed."));
                 }
             } else {
                 panic!("Not implemented yet.");
             }
 
             if frame_response != frame_request {
-                return Err("Pier fan reset failed: frame response does not match request.");
+                return Err(String::from(
+                    "Pier fan reset failed: frame response does not match request.",
+                ));
             }
         }
 
@@ -319,22 +319,20 @@ impl DataAcquisition {
     ///
     /// # Panics
     /// Panics if not in simulation mode.
-    pub fn set_chiller_temperature(
-        &mut self,
-        idx: usize,
-        temperature: f32,
-    ) -> Result<(), &'static str> {
+    pub fn set_chiller_temperature(&mut self, idx: usize, temperature: f32) -> Result<(), String> {
         // Change the temperature from Celsius to Fahrenheit and validate the
         // setpoint.
         let temperature_setpoint = celsius_to_fahrenheit(temperature) as u16;
         if temperature_setpoint > 250 {
-            return Err("Chiller temperature setpoint in Fahrenheit is out of range: [0, 250].");
+            return Err(String::from(
+                "Chiller temperature setpoint in Fahrenheit is out of range: [0, 250].",
+            ));
         }
 
         // Set the chiller temperature if the chiller is enabled.
         let unit_id = *self.config.addresses["chiller"]
             .get(idx)
-            .ok_or("Invalid chiller index.")?;
+            .ok_or(String::from("Invalid chiller index."))?;
         if self.is_enabled_chiller(idx, self._latest_telemetry.digital_inputs_mod4) {
             let transaction_id = self.get_transaction_id();
             let frame_request = self._modbus.create_frame_chiller_set_temperature(
@@ -348,19 +346,19 @@ impl DataAcquisition {
                 if let Some(reading) = plant.request_chiller(idx, &frame_request) {
                     frame_response = reading;
                 } else {
-                    return Err("Chiller request failed.");
+                    return Err(String::from("Chiller request failed."));
                 }
             } else {
                 panic!("Not implemented yet.");
             }
 
             if frame_response != frame_request {
-                return Err(
+                return Err(String::from(
                     "Chiller set temperature failed: frame response does not match request.",
-                );
+                ));
             }
         } else {
-            return Err("Chiller is not enabled.");
+            return Err(String::from("Chiller is not enabled."));
         }
 
         Ok(())
@@ -1341,14 +1339,14 @@ mod tests {
         data_acquisition: &mut DataAcquisition,
         idx: usize,
         switch_on: bool,
-    ) -> Result<(), &'static str> {
+    ) -> Result<(), String> {
         let digital_output = match idx {
             0 => DigitalOutput::OpenMov1,
             1 => DigitalOutput::OpenMov2,
             2 => DigitalOutput::OpenMov3,
             3 => DigitalOutput::OpenMov4,
             4 => DigitalOutput::OpenMov5,
-            _ => return Err("Invalid motor operated valve index."),
+            _ => return Err(String::from("Invalid motor operated valve index.")),
         };
 
         data_acquisition.switch_digital_output(digital_output, switch_on)
@@ -1437,7 +1435,7 @@ mod tests {
         // Invalid index
         assert_eq!(
             open_motor_operated_valve(&mut data_acquisition, 5, true),
-            Err("Invalid motor operated valve index.")
+            Err(String::from("Invalid motor operated valve index."))
         );
     }
 
@@ -1447,7 +1445,7 @@ mod tests {
 
         assert_eq!(
             data_acquisition.open_pressure_control_valve(2, 50.0),
-            Err("Invalid valve index.")
+            Err(String::from("Invalid valve index."))
         );
     }
 
@@ -1457,7 +1455,7 @@ mod tests {
 
         assert_eq!(
             data_acquisition.open_control_mixing_valve(3, 50.0),
-            Err("Invalid valve index.")
+            Err(String::from("Invalid valve index."))
         );
     }
 
@@ -1479,7 +1477,7 @@ mod tests {
         // Invalid index
         assert_eq!(
             data_acquisition.reset_pier_fan(2),
-            Err("Invalid pier fan index.")
+            Err(String::from("Invalid pier fan index."))
         );
 
         // Valid indices but not enabled
@@ -1538,14 +1536,16 @@ mod tests {
         // Should fail because the temperature is out of the valid range.
         assert_eq!(
             data_acquisition.set_chiller_temperature(0, 131.0),
-            Err("Chiller temperature setpoint in Fahrenheit is out of range: [0, 250].")
+            Err(String::from(
+                "Chiller temperature setpoint in Fahrenheit is out of range: [0, 250]."
+            ))
         );
 
         // Should fail because there is no chiller enabled.
         let temperature = 25.0;
         assert_eq!(
             data_acquisition.set_chiller_temperature(0, temperature),
-            Err("Chiller is not enabled.")
+            Err(String::from("Chiller is not enabled."))
         );
 
         // Should succeed because the chiller is enabled and the temperature is

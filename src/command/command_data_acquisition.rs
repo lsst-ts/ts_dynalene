@@ -19,11 +19,79 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use serde_json::Value;
+use serde::Deserialize;
+use serde_json::{Value, from_value};
 
 use crate::command::command_schema::Command;
 use crate::daq::data_acquisition::DataAcquisition;
 use crate::enums::DigitalOutput;
+
+#[derive(Deserialize, PartialEq)]
+#[serde(tag = "id", content = "parameters")]
+pub enum CommandPayload {
+    #[serde(rename = "cmd_switchDigitalOutput")]
+    SwitchDigitalOutput(ParametersSwitchDigitalOutput),
+    #[serde(rename = "cmd_openPressureControlValve")]
+    OpenPressureControlValve(ParametersOpenPressureControlValve),
+    #[serde(rename = "cmd_openControlMixingValve")]
+    OpenControlMixingValve(ParametersOpenControlMixingValve),
+    #[serde(rename = "cmd_resetPierFan")]
+    ResetPierFan(ParametersResetPierFan),
+    #[serde(rename = "cmd_setChillerTemperature")]
+    SetChillerTemperature(ParametersSetChillerTemperature),
+}
+
+#[derive(Deserialize, PartialEq)]
+pub struct ParametersSwitchDigitalOutput {
+    // Bit value. For example, 0b1000 (= 8) represents the third bit.
+    pub bit: u32,
+    // True if the digital output should be switched on, false otherwise.
+    pub status: bool,
+}
+
+#[derive(Deserialize, PartialEq)]
+pub struct ParametersOpenPressureControlValve {
+    // The index of the pressure control valve (0-1)
+    pub idx: usize,
+    // The percentage to open the valve (0.0 to 100.0). 0.0 means fully closed.
+    // 100.0 means fully open to allow all coolant goes through it.
+    pub percentage: f64,
+}
+
+#[derive(Deserialize, PartialEq)]
+pub struct ParametersOpenControlMixingValve {
+    // The index of the control mixing valve (0-2)
+    pub idx: usize,
+    // The percentage to open the valve (0.0 to 100.0). 0.0 means fully closed
+    // (recirculating for the upper loop). 100.0 means fully open to the
+    // return.
+    pub percentage: f64,
+}
+
+#[derive(Deserialize, PartialEq)]
+pub struct ParametersResetPierFan {
+    // The index of the pier fan (0-1)
+    pub idx: usize,
+}
+
+#[derive(Deserialize, PartialEq)]
+pub struct ParametersSetChillerTemperature {
+    // The index of the chiller (0-1)
+    pub idx: usize,
+    // The temperature to set for the chiller (-17.78 to 121.11) in Celsius.
+    // The range is 0 to 250 Fahrenheit after conversion in the instrument.
+    pub temperature: f32,
+}
+
+#[derive(Deserialize, PartialEq)]
+pub struct CommandFormat {
+    // Sequence ID for the command.
+    pub sequence_id: i64,
+
+    // The payload of the command.
+    #[serde(flatten)]
+    pub payload: CommandPayload,
+}
 
 /// Command to switch the digital output.
 pub struct CommandSwitchDigitalOutput;
@@ -34,23 +102,20 @@ impl Command for CommandSwitchDigitalOutput {
 
     fn execute(
         &self,
-        message: &Value,
+        message: Value,
         data_acquisition: Option<&mut DataAcquisition>,
-    ) -> Result<(), &'static str> {
-        // Bit value. For example, 0b1000 (= 8) represents the third bit.
-        let bit = message["parameters"]["bit"]
-            .as_u64()
-            .ok_or("Missing bit parameter.")?;
-        let digital_output =
-            DigitalOutput::from_repr(bit as u32).ok_or("Invalid digital output.")?;
+    ) -> Result<(), String> {
+        let command: CommandFormat = from_value(message).map_err(|error| error.to_string())?;
 
-        // True if the digital output should be switched on, false otherwise.
-        let status = message["parameters"]["status"]
-            .as_bool()
-            .ok_or("Missing status parameter.")?;
+        if let CommandPayload::SwitchDigitalOutput(parameters) = command.payload {
+            let digital_output =
+                DigitalOutput::from_repr(parameters.bit).ok_or("Invalid digital output.")?;
 
-        let system = data_acquisition.ok_or("Missing data acquisition.")?;
-        system.switch_digital_output(digital_output, status)
+            let system = data_acquisition.ok_or("Missing data acquisition.")?;
+            system.switch_digital_output(digital_output, parameters.status)
+        } else {
+            Err(String::from("Unexpected command payload."))
+        }
     }
 }
 
@@ -63,22 +128,17 @@ impl Command for CommandOpenPressureControlValve {
 
     fn execute(
         &self,
-        message: &Value,
+        message: Value,
         data_acquisition: Option<&mut DataAcquisition>,
-    ) -> Result<(), &'static str> {
-        // The index of the pressure control valve (0-1)
-        let idx = message["parameters"]["idx"]
-            .as_u64()
-            .ok_or("Missing idx parameter.")?;
+    ) -> Result<(), String> {
+        let command: CommandFormat = from_value(message).map_err(|error| error.to_string())?;
 
-        // The percentage to open the valve (0.0 to 100.0). 0.0 means fully
-        // closed. 100.0 means fully open to allow all coolant goes through it.
-        let percentage = message["parameters"]["percentage"]
-            .as_f64()
-            .ok_or("Missing percentage parameter.")?;
-
-        let system = data_acquisition.ok_or("Missing data acquisition.")?;
-        system.open_pressure_control_valve(idx as usize, percentage)
+        if let CommandPayload::OpenPressureControlValve(parameters) = command.payload {
+            let system = data_acquisition.ok_or("Missing data acquisition.")?;
+            system.open_pressure_control_valve(parameters.idx, parameters.percentage)
+        } else {
+            Err(String::from("Unexpected command payload."))
+        }
     }
 }
 
@@ -91,23 +151,17 @@ impl Command for CommandOpenControlMixingValve {
 
     fn execute(
         &self,
-        message: &Value,
+        message: Value,
         data_acquisition: Option<&mut DataAcquisition>,
-    ) -> Result<(), &'static str> {
-        // The index of the control mixing valve (0-2)
-        let idx = message["parameters"]["idx"]
-            .as_u64()
-            .ok_or("Missing idx parameter.")?;
+    ) -> Result<(), String> {
+        let command: CommandFormat = from_value(message).map_err(|error| error.to_string())?;
 
-        // The percentage to open the valve (0.0 to 100.0). 0.0 means fully
-        // closed (recirculating for the upper loop). 100.0 means fully open to
-        // the return.
-        let percentage = message["parameters"]["percentage"]
-            .as_f64()
-            .ok_or("Missing percentage parameter.")?;
-
-        let system = data_acquisition.ok_or("Missing data acquisition.")?;
-        system.open_control_mixing_valve(idx as usize, percentage)
+        if let CommandPayload::OpenControlMixingValve(parameters) = command.payload {
+            let system = data_acquisition.ok_or("Missing data acquisition.")?;
+            system.open_control_mixing_valve(parameters.idx, parameters.percentage)
+        } else {
+            Err(String::from("Unexpected command payload."))
+        }
     }
 }
 
@@ -120,16 +174,17 @@ impl Command for CommandResetPierFan {
 
     fn execute(
         &self,
-        message: &Value,
+        message: Value,
         data_acquisition: Option<&mut DataAcquisition>,
-    ) -> Result<(), &'static str> {
-        // The index of the pier fan (0-1)
-        let idx = message["parameters"]["idx"]
-            .as_u64()
-            .ok_or("Missing idx parameter.")? as usize;
+    ) -> Result<(), String> {
+        let command: CommandFormat = from_value(message).map_err(|error| error.to_string())?;
 
-        let system = data_acquisition.ok_or("Missing data acquisition.")?;
-        system.reset_pier_fan(idx)
+        if let CommandPayload::ResetPierFan(parameters) = command.payload {
+            let system = data_acquisition.ok_or("Missing data acquisition.")?;
+            system.reset_pier_fan(parameters.idx)
+        } else {
+            Err(String::from("Unexpected command payload."))
+        }
     }
 }
 
@@ -142,23 +197,17 @@ impl Command for CommandSetChillerTemperature {
 
     fn execute(
         &self,
-        message: &Value,
+        message: Value,
         data_acquisition: Option<&mut DataAcquisition>,
-    ) -> Result<(), &'static str> {
-        // The index of the chiller (0-1)
-        let idx = message["parameters"]["idx"]
-            .as_u64()
-            .ok_or("Missing idx parameter.")?;
+    ) -> Result<(), String> {
+        let command: CommandFormat = from_value(message).map_err(|error| error.to_string())?;
 
-        // The temperature to set for the chiller (-17.78 to 121.11) in
-        // Celsius. The range is 0 to 250 Fahrenheit after conversion in the
-        // instrument.
-        let temperature = message["parameters"]["temperature"]
-            .as_f64()
-            .ok_or("Missing temperature parameter.")?;
-
-        let system = data_acquisition.ok_or("Missing data acquisition.")?;
-        system.set_chiller_temperature(idx as usize, temperature as f32)
+        if let CommandPayload::SetChillerTemperature(parameters) = command.payload {
+            let system = data_acquisition.ok_or("Missing data acquisition.")?;
+            system.set_chiller_temperature(parameters.idx, parameters.temperature)
+        } else {
+            Err(String::from("Unexpected command payload."))
+        }
     }
 }
 
@@ -179,7 +228,11 @@ mod tests {
         assert!(
             command
                 .execute(
-                    &json!({"parameters": {"bit": 0b100000000, "status": true}}),
+                    json!({
+                        "id": "cmd_switchDigitalOutput",
+                        "sequence_id": 1,
+                        "parameters": {"bit": 0b100000000, "status": true}
+                    }),
                     Some(&mut data_acquisition),
                 )
                 .is_ok()
@@ -202,7 +255,11 @@ mod tests {
         assert!(
             command
                 .execute(
-                    &json!({"parameters": {"idx": 0, "percentage": 50.0}}),
+                    json!({
+                        "id": "cmd_openPressureControlValve",
+                        "sequence_id": 1,
+                        "parameters": {"idx": 0, "percentage": 50.0}
+                    }),
                     Some(&mut data_acquisition),
                 )
                 .is_ok()
@@ -219,7 +276,11 @@ mod tests {
         assert!(
             command
                 .execute(
-                    &json!({"parameters": {"idx": 0, "percentage": 50.0}}),
+                    json!({
+                        "id": "cmd_openControlMixingValve",
+                        "sequence_id": 1,
+                        "parameters": {"idx": 0, "percentage": 50.0}
+                    }),
                     Some(&mut data_acquisition),
                 )
                 .is_ok()
@@ -236,7 +297,11 @@ mod tests {
         assert!(
             command
                 .execute(
-                    &json!({"parameters": {"idx": 0}}),
+                    json!({
+                        "id": "cmd_resetPierFan",
+                        "sequence_id": 1,
+                        "parameters": {"idx": 0}
+                    }),
                     Some(&mut data_acquisition),
                 )
                 .is_ok()
@@ -252,10 +317,14 @@ mod tests {
         assert_eq!(command.name(), "cmd_setChillerTemperature");
         assert_eq!(
             command.execute(
-                &json!({"parameters": {"idx": 0, "temperature": 25.0}}),
+                json!({
+                    "id": "cmd_setChillerTemperature",
+                    "sequence_id": 1,
+                    "parameters": {"idx": 0, "temperature": 25.0}
+                }),
                 Some(&mut data_acquisition),
             ),
-            Err("Chiller is not enabled."),
+            Err(String::from("Chiller is not enabled.")),
         );
     }
 }

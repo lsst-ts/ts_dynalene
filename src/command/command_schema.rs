@@ -44,9 +44,9 @@ pub trait Command {
     /// Command execution result. If failed, returns the failure reason.
     fn execute(
         &self,
-        message: &Value,
+        message: Value,
         data_acquisition: Option<&mut DataAcquisition>,
-    ) -> Result<(), &'static str>;
+    ) -> Result<(), String>;
 }
 
 #[derive(Default)]
@@ -76,13 +76,9 @@ impl CommandSchema {
     ///
     /// # Returns
     /// Command execution result.
-    pub fn execute(
-        &self,
-        message: &Value,
-        data_acquisition: Option<&mut DataAcquisition>,
-    ) -> Value {
-        let name = get_message_name(message);
-        let sequence_id = get_message_sequence_id(message);
+    pub fn execute(&self, message: Value, data_acquisition: Option<&mut DataAcquisition>) -> Value {
+        let name = get_message_name(&message);
+        let sequence_id = get_message_sequence_id(&message);
         for cmd in &self.commands {
             if cmd.name() == name {
                 match cmd.execute(message, data_acquisition) {
@@ -95,13 +91,13 @@ impl CommandSchema {
                         );
                     }
                     Err(fail_reason) => {
-                        error!("Command execution failed: {message}. {fail_reason}");
+                        error!("Command execution failed: {fail_reason}");
 
                         return acknowledge_command(
                             Some(&name),
                             CommandStatus::Fail,
                             sequence_id,
-                            Some(fail_reason),
+                            Some(&fail_reason),
                         );
                     }
                 }
@@ -140,14 +136,14 @@ mod tests {
 
         fn execute(
             &self,
-            message: &Value,
+            message: Value,
             _data_acquisition: Option<&mut DataAcquisition>,
-        ) -> Result<(), &'static str> {
+        ) -> Result<(), String> {
             if message["parameters"]["status"].as_bool().unwrap_or(false) {
                 return Ok(());
             }
 
-            Err("Test command failed.")
+            Err(String::from("Test command failed."))
         }
     }
 
@@ -170,7 +166,7 @@ mod tests {
         let schema = create_command_schema();
 
         // Not a valid command.
-        let result = schema.execute(&json!({"id": "cmd_fail", "sequence_id": 1}), None);
+        let result = schema.execute(json!({"id": "cmd_fail", "sequence_id": 1}), None);
 
         assert_eq!(
             result.to_string(),
@@ -178,7 +174,7 @@ mod tests {
         );
 
         // No parameters field.
-        let result = schema.execute(&json!({"id": "cmd_test", "sequence_id": 2}), None);
+        let result = schema.execute(json!({"id": "cmd_test", "sequence_id": 2}), None);
 
         assert_eq!(
             result.to_string(),
@@ -187,7 +183,7 @@ mod tests {
 
         // No status field within parameters.
         let result = schema.execute(
-            &json!({"id": "cmd_test", "sequence_id": 3, "parameters": {}}),
+            json!({"id": "cmd_test", "sequence_id": 3, "parameters": {}}),
             None,
         );
 
@@ -198,7 +194,7 @@ mod tests {
 
         // Status is false.
         let result = schema.execute(
-            &json!({"id": "cmd_test", "sequence_id": 4, "parameters": {"status": false}}),
+            json!({"id": "cmd_test", "sequence_id": 4, "parameters": {"status": false}}),
             None,
         );
 
@@ -214,7 +210,7 @@ mod tests {
 
         // Has the sequence_id field.
         let result = schema.execute(
-            &json!({"id": "cmd_test", "sequence_id": 1, "parameters": {"status": true}}),
+            json!({"id": "cmd_test", "sequence_id": 1, "parameters": {"status": true}}),
             None,
         );
 
@@ -225,7 +221,7 @@ mod tests {
 
         // No sequence_id field.
         let result = schema.execute(
-            &json!({"id": "cmd_test", "parameters": {"status": true}}),
+            json!({"id": "cmd_test", "parameters": {"status": true}}),
             None,
         );
 
