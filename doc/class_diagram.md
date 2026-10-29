@@ -140,6 +140,8 @@ CommandSchema "1" *-- "n" Command
 
 Command --> DataAcquisition
 Command <|-- CommandDataAcquisition
+
+CommandDataAcquisition ..> CommandFormat
 ```
 
 ## Mock
