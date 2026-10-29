@@ -20,7 +20,10 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use crc::Crc;
+use serde_json::{Value, json};
 use std::mem::size_of;
+
+use crate::enums::CommandStatus;
 
 /// Trait for numeric types that can be parsed from a big-endian byte slice.
 pub trait FromBeByteSlice: Copy + Default {
@@ -155,6 +158,71 @@ pub fn fahrenheit_to_celsius(fahrenheit: f32) -> f32 {
     (fahrenheit - 32.0) * 5.0 / 9.0
 }
 
+/// Check if the message is a command.
+///
+/// # Arguments
+/// * `name` - Name of the message.
+///
+/// # Returns
+/// True if the message is a command, false otherwise.
+pub fn is_command(name: &str) -> bool {
+    name.starts_with("cmd_")
+}
+
+/// Acknowledge the command.
+///
+/// # Arguments
+/// * `command_name` - Name of the command.
+/// * `command_status` - Command status.
+/// * `sequence_id` - Sequence ID.
+/// * `fail_reason` - Optional reason for failure if the command failed.
+///
+/// # Returns
+/// Acknowledged command.
+pub fn acknowledge_command(
+    command_name: Option<&str>,
+    command_status: CommandStatus,
+    sequence_id: i64,
+    fail_reason: Option<&str>,
+) -> Value {
+    let mut ack: Value = json!({
+        "id": command_name.unwrap_or(""),
+        "state": command_status.as_ref().to_lowercase(),
+        "sequence_id": sequence_id,
+    });
+
+    if (command_status == CommandStatus::NoAck) || (command_status == CommandStatus::Fail) {
+        ack["fail_reason"] = json!(fail_reason.unwrap_or("Unknown reason."));
+    }
+
+    ack
+}
+
+/// Get the message name.
+///
+/// # Arguments
+/// * `message` - Message that should have the "id" field.
+///
+/// # Returns
+/// Message name. Return an empty string if the name is not found.
+pub fn get_message_name(message: &Value) -> String {
+    match message["id"].as_str() {
+        Some(id) => String::from(id),
+        None => String::new(),
+    }
+}
+
+/// Get the message sequence ID.
+///
+/// # Arguments
+/// * `message` - Message.
+///
+/// # Returns
+/// Message sequence ID. Return -1 if the sequence ID is not found.
+pub fn get_message_sequence_id(message: &Value) -> i64 {
+    message["sequence_id"].as_i64().unwrap_or(-1)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -257,5 +325,84 @@ mod tests {
         assert_eq!(fahrenheit_to_celsius(32.0), 0.0);
         assert_eq!(fahrenheit_to_celsius(212.0), 100.0);
         assert_eq!(fahrenheit_to_celsius(-40.0), -40.0);
+    }
+
+    #[test]
+    fn test_is_command() {
+        assert_eq!(is_command("cmd_test"), true);
+        assert_eq!(is_command("evt_test"), false);
+        assert_eq!(is_command("tel_test"), false);
+        assert_eq!(is_command("test"), false);
+    }
+
+    #[test]
+    fn test_acknowledge_command() {
+        assert_eq!(
+            acknowledge_command(Some("cmd_test"), CommandStatus::Success, 1, None),
+            json!({"id": "cmd_test", "state": "success", "sequence_id": 1})
+        );
+        assert_eq!(
+            acknowledge_command(None, CommandStatus::Success, 1, None),
+            json!({"id": "", "state": "success", "sequence_id": 1})
+        );
+
+        assert_eq!(
+            acknowledge_command(
+                Some("cmd_test"),
+                CommandStatus::Fail,
+                2,
+                Some("Command failed.")
+            ),
+            json!({"id": "cmd_test", "state": "fail", "sequence_id": 2, "fail_reason": "Command failed."})
+        );
+        assert_eq!(
+            acknowledge_command(None, CommandStatus::Fail, 2, None),
+            json!({"id": "", "state": "fail", "sequence_id": 2, "fail_reason": "Unknown reason."})
+        );
+
+        assert_eq!(
+            acknowledge_command(Some("cmd_test"), CommandStatus::Ack, 3, None),
+            json!({"id": "cmd_test", "state": "ack", "sequence_id": 3})
+        );
+        assert_eq!(
+            acknowledge_command(None, CommandStatus::Ack, 3, None),
+            json!({"id": "", "state": "ack", "sequence_id": 3})
+        );
+
+        assert_eq!(
+            acknowledge_command(
+                Some("cmd_test"),
+                CommandStatus::NoAck,
+                4,
+                Some("Unknown command.")
+            ),
+            json!({"id": "cmd_test", "state": "noack", "sequence_id": 4, "fail_reason": "Unknown command."})
+        );
+        assert_eq!(
+            acknowledge_command(None, CommandStatus::NoAck, 4, None),
+            json!({"id": "", "state": "noack", "sequence_id": 4, "fail_reason": "Unknown reason."})
+        );
+    }
+
+    #[test]
+    fn test_get_message_name() {
+        // There is the "id" field.
+        assert_eq!(get_message_name(&json!({"id": "cmd_test"})), "cmd_test");
+        assert_eq!(get_message_name(&json!({"id": 1})), "");
+
+        // There is no "id" field.
+        assert_eq!(get_message_name(&json!({})), "");
+        assert_eq!(get_message_name(&json!({"test": 1})), "");
+    }
+
+    #[test]
+    fn test_get_message_sequence_id() {
+        // There is the "sequence_id" field.
+        assert_eq!(get_message_sequence_id(&json!({"sequence_id": 1})), 1);
+        assert_eq!(get_message_sequence_id(&json!({"sequence_id": 1.0})), -1);
+
+        // There is no "sequence_id" field.
+        assert_eq!(get_message_sequence_id(&json!({})), -1);
+        assert_eq!(get_message_sequence_id(&json!({"test": 1})), -1);
     }
 }

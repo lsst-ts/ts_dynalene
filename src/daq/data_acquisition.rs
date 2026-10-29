@@ -36,6 +36,7 @@ use crate::enums::{AnalogInput, AnalogOutput, DigitalInputMod4, DigitalInputMod7
 use crate::event_queue::EventQueue;
 use crate::mock::mock_plant::MockPlant;
 use crate::telemetry::telemetry_data_acquisition::TelemetryDataAcquisition;
+use crate::utility::celsius_to_fahrenheit;
 
 pub struct DataAcquisition {
     // Configuration
@@ -48,6 +49,8 @@ pub struct DataAcquisition {
     _tank_levels: Vec<TankLevel>,
     // Modbus communicator
     _modbus: ModbusCommunicator,
+    // The transaction ID for the Modbus TCP communication
+    _transaction_id: u16,
     // Plant model
     pub plant: Option<MockPlant>,
 }
@@ -81,7 +84,9 @@ impl DataAcquisition {
             _latest_telemetry: TelemetryDataAcquisition::new(),
 
             _tank_levels: tank_levels,
+
             _modbus: ModbusCommunicator::new(),
+            _transaction_id: 0,
 
             plant,
         }
@@ -124,7 +129,8 @@ impl DataAcquisition {
     /// * `switch_on` - `true` to switch on, `false` to switch off.
     ///
     /// # Returns
-    /// Some if the digital output is switched successfully. Otherwise, None.
+    /// Ok if the digital output is switched successfully. Otherwise, Err with
+    /// a failure reason.
     ///
     /// # Panics
     /// Panics if not in simulation mode.
@@ -132,35 +138,14 @@ impl DataAcquisition {
         &mut self,
         digital_output: DigitalOutput,
         switch_on: bool,
-    ) -> Option<()> {
+    ) -> Result<(), String> {
         if let Some(plant) = &mut self.plant {
             plant.switch_digital_output(digital_output, switch_on);
 
-            Some(())
+            Ok(())
         } else {
             panic!("Not implemented yet.");
         }
-    }
-
-    /// Open the specified motor operated valve (MOV).
-    ///
-    /// # Arguments
-    /// * `idx` - The index of the motor operated valve (0-4).
-    /// * `switch_on` - `true` to open the valve, `false` to close it.
-    ///
-    /// # Returns
-    /// Some if the valve is switched successfully. Otherwise, None.
-    pub fn open_motor_operated_valve(&mut self, idx: usize, switch_on: bool) -> Option<()> {
-        let digital_output = match idx {
-            0 => DigitalOutput::OpenMov1,
-            1 => DigitalOutput::OpenMov2,
-            2 => DigitalOutput::OpenMov3,
-            3 => DigitalOutput::OpenMov4,
-            4 => DigitalOutput::OpenMov5,
-            _ => return None,
-        };
-
-        self.switch_digital_output(digital_output, switch_on)
     }
 
     /// Open the specified pressure control valve (PCV) to a given percentage.
@@ -172,8 +157,17 @@ impl DataAcquisition {
     ///   through it.
     ///
     /// # Returns
-    /// Some if the valve is opened successfully. Otherwise, None.
-    pub fn open_pressure_control_valve(&mut self, idx: usize, percentage: f64) -> Option<()> {
+    /// Ok if the valve is opened successfully. Otherwise, Err with a failure
+    /// reason.
+    pub fn open_pressure_control_valve(
+        &mut self,
+        idx: usize,
+        percentage: f64,
+    ) -> Result<(), String> {
+        if !self.is_valid_percentage(percentage) {
+            return Err(String::from("Percentage is not in [0, 100]."));
+        }
+
         self.open_valve(
             idx,
             &[
@@ -193,8 +187,13 @@ impl DataAcquisition {
     ///   fully open to the return.
     ///
     /// # Returns
-    /// Some if the valve is opened successfully. Otherwise, None.
-    pub fn open_control_mixing_valve(&mut self, idx: usize, percentage: f64) -> Option<()> {
+    /// Ok if the valve is opened successfully. Otherwise, Err with a failure
+    /// reason.
+    pub fn open_control_mixing_valve(&mut self, idx: usize, percentage: f64) -> Result<(), String> {
+        if !self.is_valid_percentage(percentage) {
+            return Err(String::from("Percentage is not in [0, 100]."));
+        }
+
         self.open_valve(
             idx,
             &[
@@ -204,6 +203,17 @@ impl DataAcquisition {
             ],
             percentage,
         )
+    }
+
+    /// Check if the given percentage is valid (0.0 to 100.0).
+    ///
+    /// # Arguments
+    /// * `percentage` - The percentage to check.
+    ///
+    /// # Returns
+    /// True if the percentage is valid. Otherwise, false.
+    fn is_valid_percentage(&self, percentage: f64) -> bool {
+        (0.0..=100.0).contains(&percentage)
     }
 
     /// Open the specified valve to a given percentage.
@@ -216,7 +226,8 @@ impl DataAcquisition {
     ///   means fully closed. 100.0 means fully open.
     ///
     /// # Returns
-    /// Some if the valve is opened successfully. Otherwise, None.
+    /// Ok if the valve is opened successfully. Otherwise, Err with a failure
+    /// reason.
     ///
     /// # Panics
     /// Panics if not in simulation mode.
@@ -225,27 +236,175 @@ impl DataAcquisition {
         idx: usize,
         analog_outputs: &[AnalogOutput],
         percentage: f64,
-    ) -> Option<()> {
-        let analog_output = analog_outputs.get(idx)?;
+    ) -> Result<(), String> {
+        let analog_output = analog_outputs
+            .get(idx)
+            .ok_or(String::from("Invalid valve index."))?;
         let value = percentage.clamp(0.0, 100.0) / 100.0 * MAX_ANALOG_INPUT_OUTPUT;
         if let Some(plant) = &mut self.plant {
             plant.write_analog_output(*analog_output, value);
 
-            Some(())
+            Ok(())
         } else {
             panic!("Not implemented yet.");
         }
     }
 
-    /// Get the telemetry data from the hardware.
+    /// Reset the specified pier fan.
     ///
     /// # Arguments
-    /// * `transaction_id` - The transaction ID for the Modbus TCP
-    ///   communication.
+    /// * `idx` - The index of the pier fan (0-1).
+    ///
+    /// # Returns
+    /// Ok if the pier fan is reset successfully. Otherwise, Err with a failure
+    /// reason.
+    ///
+    /// # Panics
+    /// Panics if not in simulation mode.
+    pub fn reset_pier_fan(&mut self, idx: usize) -> Result<(), String> {
+        let address = *self.config.addresses["pier_fan"]
+            .get(idx)
+            .ok_or(String::from("Invalid pier fan index."))?;
+        if self.is_enabled_pier_fan(idx, self._latest_telemetry.digital_inputs_mod7) {
+            let frame_request = self._modbus.create_frame_pier_fan_reset(address);
+
+            let frame_response;
+            if let Some(plant) = &mut self.plant {
+                if let Some(reading) = plant.request_pier_fan(&frame_request) {
+                    frame_response = reading;
+                } else {
+                    return Err(String::from("Pier fan request failed."));
+                }
+            } else {
+                panic!("Not implemented yet.");
+            }
+
+            if frame_response != frame_request {
+                return Err(String::from(
+                    "Pier fan reset failed: frame response does not match request.",
+                ));
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Check if the specified pier fan is enabled.
+    ///
+    /// # Arguments
+    /// * `idx` - The index of the pier fan (0-1).
+    /// * `digital_inputs_mod7` - The digital inputs from Mod7.
+    ///
+    /// # Returns
+    /// True if the pier fan is enabled, otherwise false.
+    fn is_enabled_pier_fan(&self, idx: usize, digital_inputs_mod7: u32) -> bool {
+        match idx {
+            0 => (digital_inputs_mod7 & DigitalInputMod7::StatusK3.bit_value()) != 0,
+            1 => (digital_inputs_mod7 & DigitalInputMod7::StatusK4.bit_value()) != 0,
+            _ => false,
+        }
+    }
+
+    /// Set the temperature of the specified chiller.
+    ///
+    /// # Arguments
+    /// * `idx` - The index of the chiller (0-1).
+    /// * `temperature` - The desired temperature (-17.78 to 121.11) in
+    ///   Celsius. The range is 0 to 250 Fahrenheit after conversion in the
+    ///   instrument.
+    ///
+    /// # Returns
+    /// Ok if the chiller temperature is set successfully. Otherwise, Err with
+    /// a failure reason.
+    ///
+    /// # Panics
+    /// Panics if not in simulation mode.
+    pub fn set_chiller_temperature(&mut self, idx: usize, temperature: f32) -> Result<(), String> {
+        // Change the temperature from Celsius to Fahrenheit and validate the
+        // setpoint.
+        let temperature_setpoint = celsius_to_fahrenheit(temperature) as u16;
+        if temperature_setpoint > 250 {
+            return Err(String::from(
+                "Chiller temperature setpoint in Fahrenheit is out of range: [0, 250].",
+            ));
+        }
+
+        // Set the chiller temperature if the chiller is enabled.
+        let unit_id = *self.config.addresses["chiller"]
+            .get(idx)
+            .ok_or(String::from("Invalid chiller index."))?;
+        if self.is_enabled_chiller(idx, self._latest_telemetry.digital_inputs_mod4) {
+            let transaction_id = self.get_transaction_id();
+            let frame_request = self._modbus.create_frame_chiller_set_temperature(
+                transaction_id,
+                unit_id,
+                temperature_setpoint,
+            );
+
+            let frame_response;
+            if let Some(plant) = &mut self.plant {
+                if let Some(reading) = plant.request_chiller(idx, &frame_request) {
+                    frame_response = reading;
+                } else {
+                    return Err(String::from("Chiller request failed."));
+                }
+            } else {
+                panic!("Not implemented yet.");
+            }
+
+            if frame_response != frame_request {
+                return Err(String::from(
+                    "Chiller set temperature failed: frame response does not match request.",
+                ));
+            }
+        } else {
+            return Err(String::from("Chiller is not enabled."));
+        }
+
+        Ok(())
+    }
+
+    /// Check if the specified chiller is enabled.
+    ///
+    /// # Arguments
+    /// * `idx` - The index of the chiller (0-1).
+    /// * `digital_inputs_mod4` - The digital inputs from Mod4.
+    ///
+    /// # Returns
+    /// True if the chiller is enabled, otherwise false.
+    fn is_enabled_chiller(&self, idx: usize, digital_inputs_mod4: u32) -> bool {
+        match idx {
+            0 => (digital_inputs_mod4 & DigitalInputMod4::StatusK21.bit_value()) != 0,
+            1 => (digital_inputs_mod4 & DigitalInputMod4::StatusK22.bit_value()) != 0,
+            _ => false,
+        }
+    }
+
+    /// Get the transaction ID for the Modbus TCP communication.
+    ///
+    /// # Notes
+    /// The transaction ID is incremented internally and wraps around at
+    /// `u16::MAX`.
+    ///
+    /// # Returns
+    /// The transaction ID.
+    fn get_transaction_id(&mut self) -> u16 {
+        let transaction_id = self._transaction_id;
+
+        if self._transaction_id == u16::MAX {
+            self._transaction_id = 0;
+        } else {
+            self._transaction_id += 1;
+        }
+
+        transaction_id
+    }
+
+    /// Get the telemetry data from the hardware.
     ///
     /// # Returns
     /// Telemetry data.
-    pub fn get_telemetry(&mut self, transaction_id: u16) -> TelemetryDataAcquisition {
+    pub fn get_telemetry(&mut self) -> TelemetryDataAcquisition {
         let mut telemetry = TelemetryDataAcquisition::new();
 
         // Read the digital inputs and outputs
@@ -273,6 +432,7 @@ impl DataAcquisition {
             self.read_recirculation_pumps(telemetry.digital_inputs_mod4);
 
         // Read the chillers
+        let transaction_id = self.get_transaction_id();
         telemetry.chillers = self.read_chillers(telemetry.digital_inputs_mod4, transaction_id);
 
         // Read the PCVs
@@ -670,14 +830,8 @@ impl DataAcquisition {
 
         let num = self.config.addresses["pier_fan"].len();
         for idx in 0..num {
-            let is_enabled = match idx {
-                0 => (digital_inputs_mod7 & DigitalInputMod7::StatusK3.bit_value()) != 0,
-                1 => (digital_inputs_mod7 & DigitalInputMod7::StatusK4.bit_value()) != 0,
-                _ => false,
-            };
-
             let address = self.config.addresses["pier_fan"][idx];
-            if is_enabled {
+            if self.is_enabled_pier_fan(idx, digital_inputs_mod7) {
                 match self.read_pier_fan(address) {
                     Some(pier_fan) => {
                         pier_fans.push(pier_fan);
@@ -913,14 +1067,8 @@ impl DataAcquisition {
 
         let num = self.config.addresses["chiller"].len();
         for idx in 0..num {
-            let is_enabled = match idx {
-                0 => (digital_inputs_mod4 & DigitalInputMod4::StatusK21.bit_value()) != 0,
-                1 => (digital_inputs_mod4 & DigitalInputMod4::StatusK22.bit_value()) != 0,
-                _ => false,
-            };
-
             let unit_id = self.config.addresses["chiller"][idx];
-            if is_enabled {
+            if self.is_enabled_chiller(idx, digital_inputs_mod4) {
                 match self.read_chiller(idx, transaction_id, unit_id) {
                     Some(chiller) => {
                         chillers.push(chiller);
@@ -1178,6 +1326,32 @@ mod tests {
 
     const EPSILON: f64 = 1e-6;
 
+    /// Open the specified motor operated valve (MOV).
+    ///
+    /// # Arguments
+    /// * `idx` - The index of the motor operated valve (0-4).
+    /// * `switch_on` - `true` to open the valve, `false` to close it.
+    ///
+    /// # Returns
+    /// Ok if the valve is switched successfully. Otherwise, Err with an error
+    /// message.
+    fn open_motor_operated_valve(
+        data_acquisition: &mut DataAcquisition,
+        idx: usize,
+        switch_on: bool,
+    ) -> Result<(), String> {
+        let digital_output = match idx {
+            0 => DigitalOutput::OpenMov1,
+            1 => DigitalOutput::OpenMov2,
+            2 => DigitalOutput::OpenMov3,
+            3 => DigitalOutput::OpenMov4,
+            4 => DigitalOutput::OpenMov5,
+            _ => return Err(String::from("Invalid motor operated valve index.")),
+        };
+
+        data_acquisition.switch_digital_output(digital_output, switch_on)
+    }
+
     #[test]
     fn test_is_simulation_mode() {
         let data_acquisition = DataAcquisition::new(true);
@@ -1193,7 +1367,7 @@ mod tests {
 
         // Switch the digital output on
         let digital_output = DigitalOutput::OpenMov5;
-        data_acquisition.switch_digital_output(digital_output, true);
+        let _ = data_acquisition.switch_digital_output(digital_output, true);
 
         assert_eq!(
             data_acquisition.plant.as_ref().unwrap().digital_outputs,
@@ -1201,7 +1375,7 @@ mod tests {
         );
 
         // Switch the digital output off
-        data_acquisition.switch_digital_output(digital_output, false);
+        let _ = data_acquisition.switch_digital_output(digital_output, false);
 
         assert_eq!(data_acquisition.plant.as_ref().unwrap().digital_outputs, 0);
     }
@@ -1227,11 +1401,7 @@ mod tests {
         ];
         for idx in 0..5 {
             // Open the valve
-            assert!(
-                data_acquisition
-                    .open_motor_operated_valve(idx, true)
-                    .is_some()
-            );
+            assert!(open_motor_operated_valve(&mut data_acquisition, idx, true).is_ok());
             assert_eq!(
                 data_acquisition.plant.as_ref().unwrap().digital_outputs,
                 DigitalOutput::OpenMov1.bit_value() << idx
@@ -1248,11 +1418,7 @@ mod tests {
             );
 
             // Close the valve
-            assert!(
-                data_acquisition
-                    .open_motor_operated_valve(idx, false)
-                    .is_some()
-            );
+            assert!(open_motor_operated_valve(&mut data_acquisition, idx, false).is_ok());
             assert_eq!(data_acquisition.plant.as_ref().unwrap().digital_outputs, 0);
             assert!(
                 data_acquisition.plant.as_ref().unwrap().digital_inputs_mod4
@@ -1267,10 +1433,9 @@ mod tests {
         }
 
         // Invalid index
-        assert!(
-            data_acquisition
-                .open_motor_operated_valve(5, true)
-                .is_none()
+        assert_eq!(
+            open_motor_operated_valve(&mut data_acquisition, 5, true),
+            Err(String::from("Invalid motor operated valve index."))
         );
     }
 
@@ -1278,10 +1443,9 @@ mod tests {
     fn test_open_pressure_control_valve_invalid_index() {
         let mut data_acquisition = DataAcquisition::new(true);
 
-        assert!(
-            data_acquisition
-                .open_pressure_control_valve(2, 50.0)
-                .is_none()
+        assert_eq!(
+            data_acquisition.open_pressure_control_valve(2, 50.0),
+            Err(String::from("Invalid valve index."))
         );
     }
 
@@ -1289,11 +1453,172 @@ mod tests {
     fn test_open_control_mixing_valve_invalid_index() {
         let mut data_acquisition = DataAcquisition::new(true);
 
+        assert_eq!(
+            data_acquisition.open_control_mixing_valve(3, 50.0),
+            Err(String::from("Invalid valve index."))
+        );
+    }
+
+    #[test]
+    fn test_is_valid_percentage() {
+        let data_acquisition = DataAcquisition::new(true);
+
+        assert_eq!(data_acquisition.is_valid_percentage(0.0), true);
+        assert_eq!(data_acquisition.is_valid_percentage(50.0), true);
+        assert_eq!(data_acquisition.is_valid_percentage(100.0), true);
+        assert_eq!(data_acquisition.is_valid_percentage(-1.0), false);
+        assert_eq!(data_acquisition.is_valid_percentage(101.0), false);
+    }
+
+    #[test]
+    fn test_reset_pier_fan() {
+        let mut data_acquisition = DataAcquisition::new(true);
+
+        // Invalid index
+        assert_eq!(
+            data_acquisition.reset_pier_fan(2),
+            Err(String::from("Invalid pier fan index."))
+        );
+
+        // Valid indices but not enabled
+        assert!(data_acquisition.reset_pier_fan(0).is_ok());
+        assert!(data_acquisition.reset_pier_fan(1).is_ok());
+
+        // Valid indices and enabled
+        data_acquisition._latest_telemetry.digital_inputs_mod7 |=
+            DigitalInputMod7::StatusK3.bit_value();
+        data_acquisition._latest_telemetry.digital_inputs_mod7 |=
+            DigitalInputMod7::StatusK4.bit_value();
+
+        assert!(data_acquisition.reset_pier_fan(0).is_ok());
+        assert!(data_acquisition.reset_pier_fan(1).is_ok());
+    }
+
+    #[test]
+    fn test_is_enabled_pier_fan() {
+        let data_acquisition = DataAcquisition::new(true);
+
+        let mut digital_inputs_mod7 = 0;
+        assert_eq!(
+            data_acquisition.is_enabled_pier_fan(0, digital_inputs_mod7),
+            false
+        );
+        assert_eq!(
+            data_acquisition.is_enabled_pier_fan(1, digital_inputs_mod7),
+            false
+        );
+
+        digital_inputs_mod7 |= DigitalInputMod7::StatusK3.bit_value();
+        assert_eq!(
+            data_acquisition.is_enabled_pier_fan(0, digital_inputs_mod7),
+            true
+        );
+        assert_eq!(
+            data_acquisition.is_enabled_pier_fan(1, digital_inputs_mod7),
+            false
+        );
+
+        digital_inputs_mod7 |= DigitalInputMod7::StatusK4.bit_value();
+        assert_eq!(
+            data_acquisition.is_enabled_pier_fan(0, digital_inputs_mod7),
+            true
+        );
+        assert_eq!(
+            data_acquisition.is_enabled_pier_fan(1, digital_inputs_mod7),
+            true
+        );
+    }
+
+    #[test]
+    fn test_set_chiller_temperature() {
+        let mut data_acquisition = DataAcquisition::new(true);
+
+        // Should fail because the temperature is out of the valid range.
+        assert_eq!(
+            data_acquisition.set_chiller_temperature(0, 131.0),
+            Err(String::from(
+                "Chiller temperature setpoint in Fahrenheit is out of range: [0, 250]."
+            ))
+        );
+
+        // Should fail because there is no chiller enabled.
+        let temperature = 25.0;
+        assert_eq!(
+            data_acquisition.set_chiller_temperature(0, temperature),
+            Err(String::from("Chiller is not enabled."))
+        );
+
+        // Should succeed because the chiller is enabled and the temperature is
+        // within the valid range.
+        data_acquisition._latest_telemetry.digital_inputs_mod4 |=
+            DigitalInputMod4::StatusK21.bit_value();
         assert!(
             data_acquisition
-                .open_control_mixing_valve(3, 50.0)
-                .is_none()
+                .set_chiller_temperature(0, temperature)
+                .is_ok()
         );
+
+        assert_eq!(data_acquisition._transaction_id, 1);
+
+        // Check the telemetry to ensure the chiller temperature was set
+        // correctly.
+        let chiller = data_acquisition.read_chiller(0, 2, 1).unwrap();
+        assert_eq!(
+            chiller.temperature_setpoint,
+            celsius_to_fahrenheit(temperature) as u16
+        );
+    }
+
+    #[test]
+    fn test_is_enabled_chiller() {
+        let data_acquisition = DataAcquisition::new(true);
+
+        let mut digital_inputs_mod4 = 0;
+        assert_eq!(
+            data_acquisition.is_enabled_chiller(0, digital_inputs_mod4),
+            false
+        );
+        assert_eq!(
+            data_acquisition.is_enabled_chiller(1, digital_inputs_mod4),
+            false
+        );
+
+        digital_inputs_mod4 |= DigitalInputMod4::StatusK21.bit_value();
+        assert_eq!(
+            data_acquisition.is_enabled_chiller(0, digital_inputs_mod4),
+            true
+        );
+        assert_eq!(
+            data_acquisition.is_enabled_chiller(1, digital_inputs_mod4),
+            false
+        );
+
+        digital_inputs_mod4 |= DigitalInputMod4::StatusK22.bit_value();
+        assert_eq!(
+            data_acquisition.is_enabled_chiller(0, digital_inputs_mod4),
+            true
+        );
+        assert_eq!(
+            data_acquisition.is_enabled_chiller(1, digital_inputs_mod4),
+            true
+        );
+    }
+
+    #[test]
+    fn test_get_transaction_id() {
+        let mut data_acquisition = DataAcquisition::new(true);
+
+        // Initially, the transaction ID should start at 0. The value should
+        // increment with each call.
+        assert_eq!(data_acquisition.get_transaction_id(), 0);
+        assert_eq!(data_acquisition.get_transaction_id(), 1);
+
+        // Set the transaction ID close to the maximum value to test the
+        // wrap-around behavior.
+        data_acquisition._transaction_id = u16::MAX - 1;
+        assert_eq!(data_acquisition.get_transaction_id(), u16::MAX - 1);
+        assert_eq!(data_acquisition.get_transaction_id(), u16::MAX);
+        assert_eq!(data_acquisition.get_transaction_id(), 0);
     }
 
     #[test]
@@ -1301,22 +1626,24 @@ mod tests {
         let mut data_acquisition = DataAcquisition::new(true);
         let percentage = 54.0;
         for idx in 0..NUM_PCV {
-            data_acquisition.open_pressure_control_valve(idx, percentage);
+            let _ = data_acquisition.open_pressure_control_valve(idx, percentage);
         }
         for idx in 0..NUM_CMV {
-            data_acquisition.open_control_mixing_valve(idx, percentage);
+            let _ = data_acquisition.open_control_mixing_valve(idx, percentage);
         }
 
-        data_acquisition.switch_digital_output(DigitalOutput::OpenMov1, true);
-        data_acquisition.switch_digital_output(DigitalOutput::PowerPierFan1, true);
-        data_acquisition.switch_digital_output(DigitalOutput::PowerPierFan2, true);
-        data_acquisition.switch_digital_output(DigitalOutput::PowerChiller1, true);
-        data_acquisition.switch_digital_output(DigitalOutput::PowerChiller2, true);
-        data_acquisition.switch_digital_output(DigitalOutput::PowerRecirculationPump1, true);
-        data_acquisition.switch_digital_output(DigitalOutput::PowerRecirculationPump2, true);
+        let _ = data_acquisition.switch_digital_output(DigitalOutput::OpenMov1, true);
+        let _ = data_acquisition.switch_digital_output(DigitalOutput::PowerPierFan1, true);
+        let _ = data_acquisition.switch_digital_output(DigitalOutput::PowerPierFan2, true);
+        let _ = data_acquisition.switch_digital_output(DigitalOutput::PowerChiller1, true);
+        let _ = data_acquisition.switch_digital_output(DigitalOutput::PowerChiller2, true);
+        let _ =
+            data_acquisition.switch_digital_output(DigitalOutput::PowerRecirculationPump1, true);
+        let _ =
+            data_acquisition.switch_digital_output(DigitalOutput::PowerRecirculationPump2, true);
 
         // Get the telemetry
-        let telemetry = data_acquisition.get_telemetry(3);
+        let telemetry = data_acquisition.get_telemetry();
 
         assert_eq!(telemetry.digital_inputs_mod4, 62121);
         assert_eq!(telemetry.digital_inputs_mod7, 3);
@@ -1330,8 +1657,10 @@ mod tests {
         assert_eq!(telemetry.pier_fans[0].address, 11);
         assert_eq!(telemetry.recirculation_pumps[0].address, 1);
 
-        assert_eq!(telemetry.chillers[0].transaction_id, 3);
+        assert_eq!(telemetry.chillers[0].transaction_id, 0);
         assert_eq!(telemetry.chillers[0].unit_id, 1);
+
+        assert_eq!(data_acquisition._transaction_id, 1);
 
         assert_eq!(telemetry.percentages_pcv[0], percentage);
         assert_eq!(telemetry.percentages_cmv[0], percentage);
@@ -1489,7 +1818,7 @@ mod tests {
 
         let percentage = 54.0;
         for idx in 0..NUM_PCV {
-            data_acquisition.open_pressure_control_valve(idx, percentage);
+            let _ = data_acquisition.open_pressure_control_valve(idx, percentage);
         }
 
         assert_eq!(
@@ -1529,7 +1858,7 @@ mod tests {
             assert!(
                 data_acquisition
                     .open_pressure_control_valve(idx, percentage)
-                    .is_some()
+                    .is_ok()
             );
             assert_eq!(
                 data_acquisition
@@ -1546,7 +1875,7 @@ mod tests {
 
         let percentage = 54.0;
         for idx in 0..NUM_CMV {
-            data_acquisition.open_control_mixing_valve(idx, percentage);
+            let _ = data_acquisition.open_control_mixing_valve(idx, percentage);
         }
 
         assert_eq!(
@@ -1564,7 +1893,7 @@ mod tests {
             assert!(
                 data_acquisition
                     .open_control_mixing_valve(idx, percentage)
-                    .is_some()
+                    .is_ok()
             );
             assert_eq!(
                 data_acquisition
