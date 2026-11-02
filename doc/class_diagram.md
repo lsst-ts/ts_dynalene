@@ -41,6 +41,7 @@ namespace mock {
 }
 
 namespace command {
+  class CommandFormat
   class CommandSchema
   class CommandDataAcquisition
 }
@@ -64,11 +65,14 @@ DataAcquisition *-- ModbusCommunicator
 DataAcquisition o-- MockPlant
 
 CommandSchema "1" *-- "n" CommandDataAcquisition
+CommandSchema ..> CommandFormat
 
 CommandDataAcquisition --> DataAcquisition
+CommandDataAcquisition ..> CommandFormat
 
 DataAcquisitionProcess *-- DataAcquisition
 DataAcquisitionProcess *-- CommandSchema
+DataAcquisitionProcess ..> CommandFormat
 DataAcquisitionProcess ..> Telemetry
 ```
 
@@ -83,9 +87,16 @@ namespace telemetry {
   class Event
 }
 
+namespace command {
+  class CommandFormat
+}
+
+CommandServer ..> CommandFormat
+
 CommandTelemetryServer --> CommandServer
 CommandTelemetryServer --> TelemetryServer
 CommandTelemetryServer ..> Event
+CommandTelemetryServer ..> CommandFormat
 ```
 
 ## Telemetry
@@ -137,11 +148,12 @@ namespace daq {
 }
 
 CommandSchema "1" *-- "n" Command
+CommandSchema ..> CommandFormat
 
 Command --> DataAcquisition
-Command <|-- CommandDataAcquisition
+Command ..> CommandFormat
 
-CommandDataAcquisition ..> CommandFormat
+Command <|-- CommandDataAcquisition
 ```
 
 ## Mock

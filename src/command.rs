@@ -20,4 +20,5 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 pub mod command_data_acquisition;
+pub mod command_format;
 pub mod command_schema;

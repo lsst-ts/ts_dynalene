@@ -9,6 +9,7 @@ See the [communication protocol](communication_protocol.md) for the communicatio
 ## Command Factory Pattern
 
 The [command factory pattern](../src/command/command_schema.rs) is applied in the system.
+For the command parameters, they should be defined in the [command_format.rs](../src/command/command_format.rs) no matter which subsystem will execute the commands.
 
 - [data acquisition](#command-of-the-data-acquisition)
 

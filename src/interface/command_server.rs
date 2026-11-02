@@ -20,13 +20,14 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use log::info;
-use serde_json::Value;
+use serde_json::{Value, from_str};
 use std::sync::mpsc::{Receiver, SyncSender, sync_channel};
 use std::time::Duration;
 
+use crate::command::command_format::CommandFormat;
 use crate::constants::BOUND_SYNC_CHANNEL;
 use crate::enums::CommandStatus;
-use crate::utility::{acknowledge_command, get_message_name, get_message_sequence_id, is_command};
+use crate::utility::{acknowledge_command, get_message_name, get_message_sequence_id};
 use ts_control_utils::tcp_server::TcpServer;
 
 pub struct CommandServer {
@@ -35,7 +36,7 @@ pub struct CommandServer {
     // Receiver of the messages to the TCP/IP.
     pub receiver_to_tcp: Receiver<Vec<Value>>,
     // Sender of the messages from the TCP/IP.
-    pub sender_from_tcp: SyncSender<Value>,
+    pub sender_from_tcp: SyncSender<CommandFormat>,
     // List of the registered commands.
     _commands: Vec<String>,
     // Last sequence ID.
@@ -50,7 +51,7 @@ impl CommandServer {
     ///
     /// # Returns
     /// Command server.
-    pub fn new(sender: &SyncSender<Value>) -> Self {
+    pub fn new(sender: &SyncSender<CommandFormat>) -> Self {
         let (sender_to_tcp, receiver_to_tcp) = sync_channel(BOUND_SYNC_CHANNEL);
 
         Self {
@@ -71,26 +72,6 @@ impl CommandServer {
     /// Sender.
     pub fn get_sender_to_tcp(&self) -> SyncSender<Vec<Value>> {
         self._sender_to_tcp.clone()
-    }
-
-    /// Register the commands.
-    ///
-    /// # Arguments
-    /// * `commands` - A vector of strings that holds the commands. The command
-    ///   name should begin with "cmd_"
-    pub fn register_commands(&mut self, commands: &[String]) {
-        self._commands = commands.to_owned();
-    }
-
-    /// Check if the command is registered or not.
-    ///
-    /// # Arguments
-    /// * `command` - Command that begins with "cmd_".
-    ///
-    /// # Returns
-    /// True if the command is registered, false otherwise.
-    pub fn is_registered_command(&self, command: &str) -> bool {
-        self._commands.contains(&String::from(command))
     }
 
     /// Reset the sequence ID.
@@ -129,41 +110,40 @@ impl CommandServer {
     /// * `tcp_server` - TCP server.
     /// * `command_server` - Command server.
     pub fn process_command(tcp_server: &mut TcpServer, command_server: &mut CommandServer) {
-        // Check the command/event from the TCP/IP and send to the internal use.
-        let message_received = tcp_server.read_json();
-        if !message_received.is_null() {
-            // Check if the message is a command.
-            let name = get_message_name(&message_received);
-            if is_command(&name) {
-                let sequence_id = get_message_sequence_id(&message_received);
-
-                // Check if the command is registered.
-                if command_server.is_registered_command(&name) {
-                    // Check the sequence ID. For the lost ones, send a NoAck.
-                    let lost_sequence_ids = command_server.check_sequence_id(sequence_id);
-                    for lost_sequence_id in lost_sequence_ids {
-                        tcp_server.write_json(&acknowledge_command(
-                            None,
-                            CommandStatus::NoAck,
-                            lost_sequence_id,
-                            Some("Command lost."),
-                        ));
-                    }
-
-                    // Acknowledge the command.
+        // Check the command from the TCP/IP and send to the internal use.
+        let message_received = tcp_server.read_string();
+        if !message_received.is_empty() {
+            if let Ok(command) = from_str::<CommandFormat>(&message_received) {
+                // Check the sequence ID. For the lost ones, send a NoAck.
+                let sequence_id = command.sequence_id;
+                let lost_sequence_ids = command_server.check_sequence_id(sequence_id);
+                for lost_sequence_id in lost_sequence_ids {
                     tcp_server.write_json(&acknowledge_command(
-                        Some(&name),
-                        CommandStatus::Ack,
-                        sequence_id,
                         None,
+                        CommandStatus::NoAck,
+                        lost_sequence_id,
+                        Some("Command lost."),
                     ));
+                }
 
-                    // Send the command to the internal receiver. Ignore the
-                    // error if the receiver is disconnected.
-                    let _ = command_server.sender_from_tcp.try_send(message_received);
-                } else {
-                    info!("Invalid command message: {message_received}.");
+                // Acknowledge the command.
+                tcp_server.write_json(&acknowledge_command(
+                    Some(command.payload.get_tag_id()),
+                    CommandStatus::Ack,
+                    sequence_id,
+                    None,
+                ));
 
+                // Send the command to the internal receiver. Ignore the
+                // error if the receiver is disconnected.
+                let _ = command_server.sender_from_tcp.try_send(command);
+            } else {
+                info!("Invalid command message: {message_received}.");
+
+                // Acknowledge the invalid command message if possible.
+                if let Ok(message) = from_str(&message_received) {
+                    let name = get_message_name(&message);
+                    let sequence_id = get_message_sequence_id(&message);
                     tcp_server.write_json(&acknowledge_command(
                         Some(&name),
                         CommandStatus::NoAck,
@@ -216,7 +196,11 @@ mod tests {
     const SLEEP_TIME: u64 = 50;
     const MAX_TIMEOUT: u64 = 200;
 
-    fn create_command_server() -> (CommandServer, SyncSender<Value>, Receiver<Value>) {
+    fn create_command_server() -> (
+        CommandServer,
+        SyncSender<CommandFormat>,
+        Receiver<CommandFormat>,
+    ) {
         let (sender_from_tcp, receiver_from_tcp) = sync_channel(BOUND_SYNC_CHANNEL);
 
         (
@@ -242,26 +226,6 @@ mod tests {
 
     fn create_tcp_client(port: i32) -> TcpStream {
         TcpStream::connect(format!("{}:{}", LOCAL_HOST, port)).expect("Tcp stream should connect.")
-    }
-
-    #[test]
-    fn test_register_commands() {
-        let mut command_server = create_command_server().0;
-
-        let commands = vec!["cmd_1".to_string(), "cmd_2".to_string()];
-        command_server.register_commands(&commands);
-
-        assert_eq!(command_server._commands, commands);
-    }
-
-    #[test]
-    fn test_is_registered_command() {
-        let mut command_server = create_command_server().0;
-
-        command_server.register_commands(&vec!["cmd_test".to_string()]);
-
-        assert_eq!(command_server.is_registered_command("cmd_test"), true);
-        assert_eq!(command_server.is_registered_command("cmd_test2"), false);
     }
 
     #[test]
@@ -308,9 +272,7 @@ mod tests {
         // Change the last sequence ID to simulate the previous connection.
         command_server._last_sequence_id = 10;
 
-        // Register the commands.
-        command_server.register_commands(&vec!["cmd_move".to_string()]);
-
+        // Run the server.
         let sender_to_tcp = command_server.get_sender_to_tcp();
 
         let (mut tcp_server, stop) = create_tcp_server();
@@ -345,24 +307,21 @@ mod tests {
         // Registered command.
         client_write_and_sleep(
             &mut client,
-            "{\"id\":\"cmd_move\",\"sequence_id\":1}\r\n",
+            "{\"id\":\"cmd_openPressureControlValve\",\"sequence_id\":1,\"parameters\":{\"idx\":0,\"percentage\":50.0}}\r\n",
             SLEEP_TIME,
         );
 
         client_read_and_assert(
             &mut client,
-            "{\"id\":\"cmd_move\",\"sequence_id\":1,\"state\":\"ack\"}\r\n",
+            "{\"id\":\"cmd_openPressureControlValve\",\"sequence_id\":1,\"state\":\"ack\"}\r\n",
         );
 
-        assert_eq!(
-            receiver_from_tcp.recv().unwrap(),
-            json!({"id": "cmd_move", "sequence_id": 1})
-        );
+        assert_eq!(receiver_from_tcp.recv().unwrap().sequence_id, 1);
 
         // Get the NoAck for the lost sequence ID.
         client_write_and_sleep(
             &mut client,
-            "{\"id\":\"cmd_move\",\"sequence_id\":4}\r\n",
+            "{\"id\":\"cmd_openPressureControlValve\",\"sequence_id\":4,\"parameters\":{\"idx\":0,\"percentage\":50.0}}\r\n",
             SLEEP_TIME,
         );
 
@@ -377,13 +336,10 @@ mod tests {
 
         client_read_and_assert(
             &mut client,
-            "{\"id\":\"cmd_move\",\"sequence_id\":4,\"state\":\"ack\"}\r\n",
+            "{\"id\":\"cmd_openPressureControlValve\",\"sequence_id\":4,\"state\":\"ack\"}\r\n",
         );
 
-        assert_eq!(
-            receiver_from_tcp.recv().unwrap(),
-            json!({"id": "cmd_move", "sequence_id": 4})
-        );
+        assert_eq!(receiver_from_tcp.recv().unwrap().sequence_id, 4);
 
         // Write the message to the TCP/IP.
         for value in 0..3 {

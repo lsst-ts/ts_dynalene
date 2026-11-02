@@ -158,17 +158,6 @@ pub fn fahrenheit_to_celsius(fahrenheit: f32) -> f32 {
     (fahrenheit - 32.0) * 5.0 / 9.0
 }
 
-/// Check if the message is a command.
-///
-/// # Arguments
-/// * `name` - Name of the message.
-///
-/// # Returns
-/// True if the message is a command, false otherwise.
-pub fn is_command(name: &str) -> bool {
-    name.starts_with("cmd_")
-}
-
 /// Acknowledge the command.
 ///
 /// # Arguments
@@ -325,14 +314,6 @@ mod tests {
         assert_eq!(fahrenheit_to_celsius(32.0), 0.0);
         assert_eq!(fahrenheit_to_celsius(212.0), 100.0);
         assert_eq!(fahrenheit_to_celsius(-40.0), -40.0);
-    }
-
-    #[test]
-    fn test_is_command() {
-        assert_eq!(is_command("cmd_test"), true);
-        assert_eq!(is_command("evt_test"), false);
-        assert_eq!(is_command("tel_test"), false);
-        assert_eq!(is_command("test"), false);
     }
 
     #[test]

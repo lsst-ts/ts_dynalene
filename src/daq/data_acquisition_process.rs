@@ -34,12 +34,12 @@ use crate::command::{
         CommandOpenControlMixingValve, CommandOpenPressureControlValve, CommandResetPierFan,
         CommandSetChillerTemperature, CommandSwitchDigitalOutput,
     },
+    command_format::CommandFormat,
     command_schema::CommandSchema,
 };
 use crate::constants::BOUND_SYNC_CHANNEL;
 use crate::daq::data_acquisition::DataAcquisition;
 use crate::telemetry::telemetry::Telemetry;
-use crate::utility::get_message_sequence_id;
 
 pub struct DataAcquisitionProcess {
     // Data acquisition (DAQ) system
@@ -49,9 +49,9 @@ pub struct DataAcquisitionProcess {
     // Sender of the message to the model
     _sender_to_model: SyncSender<Telemetry>,
     // Sender of the message to DAQ
-    _sender_to_daq: SyncSender<Value>,
+    _sender_to_daq: SyncSender<CommandFormat>,
     // Receiver of the message to DAQ
-    _receiver_to_daq: Receiver<Value>,
+    _receiver_to_daq: Receiver<CommandFormat>,
     // Stop the loop.
     _stop: Arc<AtomicBool>,
 }
@@ -71,8 +71,8 @@ impl DataAcquisitionProcess {
     pub fn new(
         is_simulation_mode: bool,
         sender_to_model: &SyncSender<Telemetry>,
-        sender_to_daq: SyncSender<Value>,
-        receiver_to_daq: Receiver<Value>,
+        sender_to_daq: SyncSender<CommandFormat>,
+        receiver_to_daq: Receiver<CommandFormat>,
         stop: &Arc<AtomicBool>,
     ) -> Self {
         Self {
@@ -112,8 +112,8 @@ impl DataAcquisitionProcess {
     ///
     /// # Returns
     /// A tuple of the sender and receiver to the data acquisition.
-    pub fn create_sender_and_receiver_to_data_acquisition() -> (SyncSender<Value>, Receiver<Value>)
-    {
+    pub fn create_sender_and_receiver_to_data_acquisition()
+    -> (SyncSender<CommandFormat>, Receiver<CommandFormat>) {
         sync_channel(BOUND_SYNC_CHANNEL)
     }
 
@@ -121,7 +121,7 @@ impl DataAcquisitionProcess {
     ///
     /// # Returns
     /// The sender to the data acquisition.
-    pub fn get_sender_to_data_acquisition(&self) -> SyncSender<Value> {
+    pub fn get_sender_to_data_acquisition(&self) -> SyncSender<CommandFormat> {
         self._sender_to_daq.clone()
     }
 
@@ -145,7 +145,7 @@ impl DataAcquisitionProcess {
             // adjust the valves and others.
             let mut command_result = None;
             while let Ok(message) = self._receiver_to_daq.try_recv() {
-                command_result = self.execute_and_check_internal_command(message);
+                command_result = self.execute_and_check_internal_command(&message);
 
                 // Stop processing further messages if a command result is
                 // obtained. It should be an external command and we need to
@@ -199,12 +199,11 @@ impl DataAcquisitionProcess {
     ///
     /// # Returns
     /// The command result, or None if it's an internal command.
-    fn execute_and_check_internal_command(&mut self, message: Value) -> Option<Value> {
-        let is_internal_command = get_message_sequence_id(&message) == -1;
-
+    fn execute_and_check_internal_command(&mut self, message: &CommandFormat) -> Option<Value> {
         let result = self._command_schema.execute(message, Some(&mut self.daq));
 
         // For the internal command, no need to send the result.
+        let is_internal_command = message.sequence_id == -1;
         if is_internal_command {
             None
         } else {
@@ -217,7 +216,7 @@ impl DataAcquisitionProcess {
 mod tests {
     use super::*;
 
-    use serde_json::json;
+    use serde_json::{from_value, json};
     use std::thread::spawn;
 
     fn create_data_acquisition_process() -> (DataAcquisitionProcess, Receiver<Telemetry>) {
@@ -269,14 +268,17 @@ mod tests {
 
         // Send multiple internal commands to the data acquisition process.
         for percentage in 0..=20 {
-            let _ = sender_to_data_acquisition.try_send(json!({
-                "id": "cmd_openControlMixingValve",
-                "sequence_id": -1,
-                "parameters": {
-                    "idx": 0,
-                    "percentage": percentage as f64,
-                }
-            }));
+            let _ = sender_to_data_acquisition.try_send(
+                from_value(json!({
+                    "id": "cmd_openControlMixingValve",
+                    "sequence_id": -1,
+                    "parameters": {
+                        "idx": 0,
+                        "percentage": percentage as f64,
+                    }
+                }))
+                .unwrap(),
+            );
         }
 
         let mut counter = 0;
@@ -303,14 +305,17 @@ mod tests {
         assert!(counter < 10);
 
         // Turn on the pressure control valve as an external command.
-        let _ = sender_to_data_acquisition.try_send(json!({
-            "id": "cmd_openPressureControlValve",
-            "sequence_id": 2,
-            "parameters": {
-                "idx": 0,
-                "percentage": 10.0,
-            },
-        }));
+        let _ = sender_to_data_acquisition.try_send(
+            from_value(json!({
+                "id": "cmd_openPressureControlValve",
+                "sequence_id": 2,
+                "parameters": {
+                    "idx": 0,
+                    "percentage": 10.0,
+                },
+            }))
+            .unwrap(),
+        );
 
         // Check the telemetry data.
         let latest_telemetry_success;
@@ -337,14 +342,17 @@ mod tests {
         );
 
         // Should fail for the wrong index.
-        let _ = sender_to_data_acquisition.try_send(json!({
-            "id": "cmd_openPressureControlValve",
-            "sequence_id": 3,
-            "parameters": {
-                "idx": 2,
-                "percentage": 10.0,
-            },
-        }));
+        let _ = sender_to_data_acquisition.try_send(
+            from_value(json!({
+                "id": "cmd_openPressureControlValve",
+                "sequence_id": 3,
+                "parameters": {
+                    "idx": 2,
+                    "percentage": 10.0,
+                },
+            }))
+            .unwrap(),
+        );
 
         let latest_telemetry_fail;
         loop {
@@ -377,36 +385,38 @@ mod tests {
         let mut data_acquisition_process = create_data_acquisition_process().0;
 
         // Test an internal command.
-        let command_internal = json!({
+        let command_internal = from_value(json!({
             "id": "cmd_openPressureControlValve",
-            "parameters": {
-                "idx": 0,
-                "percentage": 10.0,
-            },
-        });
+            "sequence_id": -1,
+            "parameters": {"idx": 0, "percentage": 10.0}
+        }))
+        .unwrap();
+
         let result_internal =
-            data_acquisition_process.execute_and_check_internal_command(command_internal);
+            data_acquisition_process.execute_and_check_internal_command(&command_internal);
 
         assert!(result_internal.is_none());
 
         // Test a non-internal command.
-        let command_external = json!({
+        let command_external = from_value(json!({
             "id": "cmd_openPressureControlValve",
-            "sequence_id": 2,
+            "sequence_id": 1,
             "parameters": {
                 "idx": 0,
                 "percentage": 10.0,
             },
-        });
+        }))
+        .unwrap();
+
         let result_external =
-            data_acquisition_process.execute_and_check_internal_command(command_external);
+            data_acquisition_process.execute_and_check_internal_command(&command_external);
 
         assert_eq!(
             result_external.unwrap(),
             json!({
                 "id": "cmd_openPressureControlValve",
                 "state": "success",
-                "sequence_id": 2,
+                "sequence_id": 1,
             })
         );
     }

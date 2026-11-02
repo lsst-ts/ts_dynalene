@@ -21,18 +21,19 @@
 
 use log::error;
 use serde_json::Value;
+use std::collections::HashMap;
 
+use crate::command::command_format::{CommandFormat, CommandId};
 use crate::daq::data_acquisition::DataAcquisition;
 use crate::enums::CommandStatus;
-use crate::utility::get_message_name;
-use crate::utility::{acknowledge_command, get_message_sequence_id};
+use crate::utility::acknowledge_command;
 
 pub trait Command {
-    /// Get the name of the command.
+    /// Get the ID of the command.
     ///
     /// # Returns
-    /// Command name.
-    fn name(&self) -> &str;
+    /// Command ID.
+    fn id(&self) -> CommandId;
 
     /// Execute the command.
     ///
@@ -44,28 +45,28 @@ pub trait Command {
     /// Command execution result. If failed, returns the failure reason.
     fn execute(
         &self,
-        message: Value,
+        message: &CommandFormat,
         data_acquisition: Option<&mut DataAcquisition>,
     ) -> Result<(), String>;
 }
 
 #[derive(Default)]
 pub struct CommandSchema {
-    // List of commands.
-    pub commands: Vec<Box<dyn Command + Send>>,
+    // HashMap of commands.
+    pub commands: HashMap<CommandId, Box<dyn Command + Send>>,
 }
 
 impl CommandSchema {
     /// Create a new command schema.
     pub fn new() -> Self {
         Self {
-            commands: Vec::new(),
+            commands: HashMap::new(),
         }
     }
 
     /// Add a command to the schema.
     pub fn add_command(&mut self, command: Box<dyn Command + Send>) {
-        self.commands.push(command);
+        self.commands.insert(command.id(), command);
     }
 
     /// Execute a command.
@@ -76,38 +77,35 @@ impl CommandSchema {
     ///
     /// # Returns
     /// Command execution result.
-    pub fn execute(&self, message: Value, data_acquisition: Option<&mut DataAcquisition>) -> Value {
-        let name = get_message_name(&message);
-        let sequence_id = get_message_sequence_id(&message);
-        for cmd in &self.commands {
-            if cmd.name() == name {
-                match cmd.execute(message, data_acquisition) {
-                    Ok(_) => {
-                        return acknowledge_command(
-                            Some(&name),
-                            CommandStatus::Success,
-                            sequence_id,
-                            None,
-                        );
-                    }
-                    Err(fail_reason) => {
-                        error!("Command execution failed: {fail_reason}");
-
-                        return acknowledge_command(
-                            Some(&name),
-                            CommandStatus::Fail,
-                            sequence_id,
-                            Some(&fail_reason),
-                        );
-                    }
+    pub fn execute(
+        &self,
+        message: &CommandFormat,
+        data_acquisition: Option<&mut DataAcquisition>,
+    ) -> Value {
+        let tag_id = message.payload.get_tag_id();
+        let sequence_id = message.sequence_id;
+        if let Some(command) = self.commands.get(&CommandId::from(&message.payload)) {
+            return match command.execute(message, data_acquisition) {
+                Ok(_) => {
+                    acknowledge_command(Some(tag_id), CommandStatus::Success, sequence_id, None)
                 }
-            }
+                Err(fail_reason) => {
+                    error!("Command execution failed: {fail_reason}");
+
+                    acknowledge_command(
+                        Some(tag_id),
+                        CommandStatus::Fail,
+                        sequence_id,
+                        Some(&fail_reason),
+                    )
+                }
+            };
         }
 
-        error!("Unknown command: {message}.");
+        error!("Unknown command: {tag_id}.");
 
         acknowledge_command(
-            Some(&name),
+            Some(tag_id),
             CommandStatus::Fail,
             sequence_id,
             Some("Unknown command."),
@@ -126,30 +124,17 @@ impl CommandSchema {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
+    use serde_json::{from_value, json};
 
-    struct CommandTest;
-    impl Command for CommandTest {
-        fn name(&self) -> &str {
-            "cmd_test"
-        }
-
-        fn execute(
-            &self,
-            message: Value,
-            _data_acquisition: Option<&mut DataAcquisition>,
-        ) -> Result<(), String> {
-            if message["parameters"]["status"].as_bool().unwrap_or(false) {
-                return Ok(());
-            }
-
-            Err(String::from("Test command failed."))
-        }
-    }
+    use crate::command::command_data_acquisition::{
+        CommandResetPierFan, CommandSwitchDigitalOutput,
+    };
+    use crate::daq::data_acquisition::DataAcquisition;
 
     fn create_command_schema() -> CommandSchema {
         let mut schema = CommandSchema::new();
-        schema.add_command(Box::new(CommandTest));
+        schema.add_command(Box::new(CommandSwitchDigitalOutput));
+        schema.add_command(Box::new(CommandResetPierFan));
 
         schema
     }
@@ -158,7 +143,7 @@ mod tests {
     fn test_new() {
         let schema = create_command_schema();
 
-        assert_eq!(schema.commands.len(), 1);
+        assert_eq!(schema.commands.len(), 2);
     }
 
     #[test]
@@ -166,68 +151,91 @@ mod tests {
         let schema = create_command_schema();
 
         // Not a valid command.
-        let result = schema.execute(json!({"id": "cmd_fail", "sequence_id": 1}), None);
-
-        assert_eq!(
-            result.to_string(),
-            r#"{"fail_reason":"Unknown command.","id":"cmd_fail","sequence_id":1,"state":"fail"}"#
-        );
-
-        // No parameters field.
-        let result = schema.execute(json!({"id": "cmd_test", "sequence_id": 2}), None);
-
-        assert_eq!(
-            result.to_string(),
-            r#"{"fail_reason":"Test command failed.","id":"cmd_test","sequence_id":2,"state":"fail"}"#
-        );
-
-        // No status field within parameters.
         let result = schema.execute(
-            json!({"id": "cmd_test", "sequence_id": 3, "parameters": {}}),
+            &from_value(json!({
+                "id": "cmd_openPressureControlValve",
+                "sequence_id": 1,
+                "parameters": {"idx": 0, "percentage": 50.0}
+            }))
+            .unwrap(),
             None,
         );
 
         assert_eq!(
             result.to_string(),
-            r#"{"fail_reason":"Test command failed.","id":"cmd_test","sequence_id":3,"state":"fail"}"#
+            r#"{"fail_reason":"Unknown command.","id":"cmd_openPressureControlValve","sequence_id":1,"state":"fail"}"#
         );
 
-        // Status is false.
+        // No subsystem to execute the command.
         let result = schema.execute(
-            json!({"id": "cmd_test", "sequence_id": 4, "parameters": {"status": false}}),
+            &from_value(json!({
+                "id": "cmd_switchDigitalOutput",
+                "sequence_id": 2,
+                "parameters": {"bit": 0b100000000, "status": true}
+            }))
+            .unwrap(),
             None,
         );
 
         assert_eq!(
             result.to_string(),
-            r#"{"fail_reason":"Test command failed.","id":"cmd_test","sequence_id":4,"state":"fail"}"#
+            r#"{"fail_reason":"Missing data acquisition.","id":"cmd_switchDigitalOutput","sequence_id":2,"state":"fail"}"#
+        );
+
+        // Failed execution in the subsystem.
+        let mut data_acquisition = DataAcquisition::new(true);
+
+        let result = schema.execute(
+            &from_value(json!({
+                "id": "cmd_resetPierFan",
+                "sequence_id": 3,
+                "parameters": {"idx": 3}
+            }))
+            .unwrap(),
+            Some(&mut data_acquisition),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            r#"{"fail_reason":"Invalid pier fan index.","id":"cmd_resetPierFan","sequence_id":3,"state":"fail"}"#
         );
     }
 
     #[test]
     fn test_execute_success() {
         let schema = create_command_schema();
+        let mut data_acquisition = DataAcquisition::new(true);
 
         // Has the sequence_id field.
         let result = schema.execute(
-            json!({"id": "cmd_test", "sequence_id": 1, "parameters": {"status": true}}),
-            None,
+            &from_value(json!({
+                "id": "cmd_switchDigitalOutput",
+                "sequence_id": 1,
+                "parameters": {"bit": 0b100000000, "status": true}
+            }))
+            .unwrap(),
+            Some(&mut data_acquisition),
         );
 
         assert_eq!(
             result.to_string(),
-            r#"{"id":"cmd_test","sequence_id":1,"state":"success"}"#
+            r#"{"id":"cmd_switchDigitalOutput","sequence_id":1,"state":"success"}"#
         );
 
-        // No sequence_id field.
+        // Internal command (sequence_id = -1).
         let result = schema.execute(
-            json!({"id": "cmd_test", "parameters": {"status": true}}),
-            None,
+            &from_value(json!({
+                "id": "cmd_switchDigitalOutput",
+                "sequence_id": -1,
+                "parameters": {"bit": 0b100000000, "status": true}
+            }))
+            .unwrap(),
+            Some(&mut data_acquisition),
         );
 
         assert_eq!(
             result.to_string(),
-            r#"{"id":"cmd_test","sequence_id":-1,"state":"success"}"#
+            r#"{"id":"cmd_switchDigitalOutput","sequence_id":-1,"state":"success"}"#
         );
     }
 
@@ -235,6 +243,6 @@ mod tests {
     fn test_number_of_commands() {
         let schema = create_command_schema();
 
-        assert_eq!(schema.number_of_commands(), 1);
+        assert_eq!(schema.number_of_commands(), 2);
     }
 }

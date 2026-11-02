@@ -30,6 +30,7 @@ use std::sync::{
 use std::thread::{JoinHandle, sleep, spawn};
 use std::time::Duration;
 
+use crate::command::command_format::CommandFormat;
 use crate::enums::Commander;
 use crate::interface::command_server::CommandServer;
 use crate::interface::telemetry_server::TelemetryServer;
@@ -47,16 +48,16 @@ pub struct CommandTelemetryServer {
     pub timeout: u64,
     // An Arc instance that holds the AtomicBool instance to stop the server.
     _stop: Arc<AtomicBool>,
-    // Sender of the messages from the TCP/IP.
-    _sender_from_tcp: SyncSender<Value>,
+    // Sender of the commands from the TCP/IP.
+    _sender_from_tcp_command: SyncSender<CommandFormat>,
+    // Sender of the events from the command telemetry server.
+    _sender_from_command_telemetry_server: SyncSender<Value>,
     // Senders of the messages to the TCP/IP servers.
     pub senders_to_tcp: HashMap<String, Option<SyncSender<Vec<Value>>>>,
     // Server's connection status.
     _connections: HashMap<String, Arc<AtomicBool>>,
     // Thread handles for the command and telemetry servers
     _handles: Vec<JoinHandle<()>>,
-    // List of the registered commands.
-    _commands: Vec<String>,
 }
 
 impl CommandTelemetryServer {
@@ -72,10 +73,13 @@ impl CommandTelemetryServer {
     /// * `timeout` - Timeout in milliseconds.
     /// * `stop` - An Arc instance that holds the AtomicBool instance to stop
     ///   the server.
-    /// * `sender` - Sender of the messages from the TCP/IP.
+    /// * `sender_command` - Sender of the commands from the TCP/IP.
+    /// * `sender_command_telemetry_server` - Sender of the events from the
+    ///   command telemetry server.
     ///
     /// # Returns
     /// A command telemetry server instance.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         name: Commander,
         host: &str,
@@ -83,7 +87,8 @@ impl CommandTelemetryServer {
         port_telemetry: i32,
         timeout: u64,
         stop: &Arc<AtomicBool>,
-        sender: SyncSender<Value>,
+        sender_command: SyncSender<CommandFormat>,
+        sender_command_telemetry_server: SyncSender<Value>,
     ) -> Self {
         let mut ports = HashMap::new();
         ports.insert("command".to_string(), port_command);
@@ -106,30 +111,13 @@ impl CommandTelemetryServer {
 
             _stop: stop.clone(),
 
-            _sender_from_tcp: sender,
+            _sender_from_tcp_command: sender_command,
+            _sender_from_command_telemetry_server: sender_command_telemetry_server,
             senders_to_tcp,
 
             _connections: connections,
 
             _handles: Vec::new(),
-
-            _commands: Vec::new(),
-        }
-    }
-
-    /// Register a command.
-    ///
-    /// # Arguments
-    /// * `command_name` - Name of the command that begins with "cmd_".
-    ///   Otherwise, it is ignored.
-    pub fn register_command(&mut self, command_name: &str) {
-        if !command_name.starts_with("cmd_") {
-            return;
-        }
-
-        let command = String::from(command_name);
-        if !self._commands.contains(&command) {
-            self._commands.push(command);
         }
     }
 
@@ -140,11 +128,8 @@ impl CommandTelemetryServer {
     /// The second integer is the telemetry port number.
     pub fn run_servers(&mut self) -> (i32, i32) {
         // Create the command and telemetry servers
-        let mut command_server = CommandServer::new(&self._sender_from_tcp);
+        let mut command_server = CommandServer::new(&self._sender_from_tcp_command);
         let mut telemetry_server = TelemetryServer::new();
-
-        // Register the commands
-        command_server.register_commands(&self._commands);
 
         // Get the sender to the TCP/IP
         self.senders_to_tcp.insert(
@@ -227,7 +212,7 @@ impl CommandTelemetryServer {
                 are_connected = !are_connected;
 
                 if self
-                    ._sender_from_tcp
+                    ._sender_from_command_telemetry_server
                     .try_send(Event::get_message_tcp_ip_connected(are_connected))
                     .is_err()
                 {
@@ -293,10 +278,14 @@ mod tests {
     fn create_command_telemetry_server() -> (
         CommandTelemetryServer,
         Arc<AtomicBool>,
+        SyncSender<CommandFormat>,
         SyncSender<Value>,
+        Receiver<CommandFormat>,
         Receiver<Value>,
     ) {
-        let (sender_from_tcp, receiver_from_tcp) = sync_channel(BOUND_SYNC_CHANNEL);
+        let (sender_from_tcp_command, receiver_from_tcp_command) = sync_channel(BOUND_SYNC_CHANNEL);
+        let (sender_from_command_telemetry_server, receiver_from_command_telemetry_server) =
+            sync_channel(BOUND_SYNC_CHANNEL);
 
         let stop = Arc::new(AtomicBool::new(false));
         let server = CommandTelemetryServer::new(
@@ -306,10 +295,18 @@ mod tests {
             0,
             TIMEOUT,
             &stop,
-            sender_from_tcp.clone(),
+            sender_from_tcp_command.clone(),
+            sender_from_command_telemetry_server.clone(),
         );
 
-        (server, stop, sender_from_tcp, receiver_from_tcp)
+        (
+            server,
+            stop,
+            sender_from_tcp_command,
+            sender_from_command_telemetry_server,
+            receiver_from_tcp_command,
+            receiver_from_command_telemetry_server,
+        )
     }
 
     fn create_tcp_clients(port_command: i32, port_telemetry: i32) -> (TcpStream, TcpStream) {
@@ -319,27 +316,6 @@ mod tests {
             TcpStream::connect(format!("{}:{}", LOCAL_HOST, port_telemetry))
                 .expect("Tcp telemetry stream should connect."),
         )
-    }
-
-    #[test]
-    fn test_register_command() {
-        let mut server = create_command_telemetry_server().0;
-
-        // Ignore the command that does not start with "cmd_".
-        server.register_command("test");
-        assert_eq!(server._commands, Vec::<String>::new());
-
-        // First command.
-        server.register_command("cmd_test");
-        assert_eq!(server._commands, vec!["cmd_test"]);
-
-        // Repeated command.
-        server.register_command("cmd_test");
-        assert_eq!(server._commands, vec!["cmd_test"]);
-
-        // Second command.
-        server.register_command("cmd_test2");
-        assert_eq!(server._commands, vec!["cmd_test", "cmd_test2"]);
     }
 
     #[test]
@@ -360,8 +336,7 @@ mod tests {
 
     #[test]
     fn test_run_servers() {
-        let (mut server, _, _, receiver_from_tcp) = create_command_telemetry_server();
-        server.register_command("cmd_move");
+        let (mut server, _, _, _, receiver_from_tcp_command, _) = create_command_telemetry_server();
 
         // Run the server
         let (port_command, port_telemetry) = server.run_servers();
@@ -377,19 +352,16 @@ mod tests {
         // Command client writes the command
         client_write_and_sleep(
             &mut client_command,
-            "{\"id\":\"cmd_move\",\"sequence_id\":0}\r\n",
+            "{\"id\":\"cmd_openPressureControlValve\",\"sequence_id\":0,\"parameters\":{\"idx\":0,\"percentage\":50.0}}\r\n",
             TIMEOUT,
         );
 
         client_read_and_assert(
             &mut client_command,
-            "{\"id\":\"cmd_move\",\"sequence_id\":0,\"state\":\"ack\"}\r\n",
+            "{\"id\":\"cmd_openPressureControlValve\",\"sequence_id\":0,\"state\":\"ack\"}\r\n",
         );
 
-        assert_eq!(
-            receiver_from_tcp.recv().unwrap(),
-            json!({"id": "cmd_move", "sequence_id": 0})
-        );
+        assert_eq!(receiver_from_tcp_command.recv().unwrap().sequence_id, 0);
 
         server.senders_to_tcp["command"]
             .as_ref()
@@ -414,7 +386,8 @@ mod tests {
 
     #[test]
     fn test_run_monitor_loop() {
-        let (mut server, stop, _, receiver_from_tcp) = create_command_telemetry_server();
+        let (mut server, stop, _, _, _, receiver_from_command_telemetry_server) =
+            create_command_telemetry_server();
 
         // Run the servers
         let (port_command, port_telemetry) = server.run_servers();
@@ -428,7 +401,7 @@ mod tests {
         let (client_command, client_telemetry) = create_tcp_clients(port_command, port_telemetry);
 
         assert_eq!(
-            receiver_from_tcp.recv().unwrap(),
+            receiver_from_command_telemetry_server.recv().unwrap(),
             json!({"id": "tcpIpConnected", "isConnected": true})
         );
 
@@ -437,7 +410,7 @@ mod tests {
         let _ = client_telemetry.shutdown(Shutdown::Both);
 
         assert_eq!(
-            receiver_from_tcp.recv().unwrap(),
+            receiver_from_command_telemetry_server.recv().unwrap(),
             json!({"id": "tcpIpConnected", "isConnected": false})
         );
 
