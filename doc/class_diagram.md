@@ -3,7 +3,9 @@
 There are the following modules in the control system:
 
 - [daq](#daq)
+- [interface](#interface)
 - [telemetry](#telemetry)
+- [command](#command)
 - [mock](#mock)
 
 Show the main class diagram below:
@@ -28,11 +30,20 @@ namespace main {
 }
 
 namespace telemetry {
+  class Telemetry
   class TelemetryDataAcquisition
 }
 
+Telemetry o-- TelemetryDataAcquisition
+
 namespace mock {
   class MockPlant
+}
+
+namespace command {
+  class CommandFormat
+  class CommandSchema
+  class CommandDataAcquisition
 }
 
 RecirculationPump o-- RecirculationPumpCimConfiguration
@@ -52,6 +63,40 @@ DataAcquisition *-- TelemetryDataAcquisition
 DataAcquisition "1" *-- "2" TankLevel
 DataAcquisition *-- ModbusCommunicator
 DataAcquisition o-- MockPlant
+
+CommandSchema "1" *-- "n" CommandDataAcquisition
+CommandSchema ..> CommandFormat
+
+CommandDataAcquisition --> DataAcquisition
+CommandDataAcquisition ..> CommandFormat
+
+DataAcquisitionProcess *-- DataAcquisition
+DataAcquisitionProcess *-- CommandSchema
+DataAcquisitionProcess ..> CommandFormat
+DataAcquisitionProcess ..> Telemetry
+```
+
+## Interface
+
+The [interface](../src/interface/) module supports the TCP/IP communication:
+
+```mermaid
+classDiagram
+
+namespace telemetry {
+  class Event
+}
+
+namespace command {
+  class CommandFormat
+}
+
+CommandServer ..> CommandFormat
+
+CommandTelemetryServer --> CommandServer
+CommandTelemetryServer --> TelemetryServer
+CommandTelemetryServer ..> Event
+CommandTelemetryServer ..> CommandFormat
 ```
 
 ## Telemetry
@@ -87,6 +132,28 @@ TelemetryDataAcquisition ..> PowerGridMonitor
 TelemetryDataAcquisition ..> RecirculationPump
 
 Telemetry o-- TelemetryDataAcquisition
+
+class Event
+```
+
+## Command
+
+The [command](../src/command/) module implements the command factory:
+
+```mermaid
+classDiagram
+
+namespace daq {
+  class DataAcquisition
+}
+
+CommandSchema "1" *-- "n" Command
+CommandSchema ..> CommandFormat
+
+Command --> DataAcquisition
+Command ..> CommandFormat
+
+Command <|-- CommandDataAcquisition
 ```
 
 ## Mock

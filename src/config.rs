@@ -22,10 +22,12 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use ts_control_utils::utility::get_parameter_array;
+use ts_control_utils::utility::{get_parameter, get_parameter_array};
 
 #[derive(Debug, Default)]
 pub struct Config {
+    // The frequency of data acquisition (DAQ) loop in Hz.
+    pub frequency_loop: f64,
     // Addresses for various devices on different buses.
     pub addresses: HashMap<String, Vec<u8>>,
     // IPs for the chillers.
@@ -44,6 +46,8 @@ impl Config {
     pub fn new() -> Self {
         let filepath = Path::new("config/parameters_app.yaml");
         Self {
+            frequency_loop: get_parameter(filepath, "frequency_loop"),
+
             addresses: Self::read_addresses(filepath),
 
             ips_chiller: get_parameter_array(filepath, "ips_chiller"),
@@ -145,6 +149,7 @@ mod tests {
     fn test_new() {
         let config = Config::new();
 
+        assert_eq!(config.frequency_loop, 20.0);
         assert_eq!(config.addresses.len(), 10);
         assert_eq!(config.ips_chiller.len(), 2);
         assert_eq!(config.ports_chiller.len(), 2);

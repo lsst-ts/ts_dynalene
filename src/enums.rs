@@ -20,7 +20,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use strum::IntoEnumIterator;
-use strum_macros::{EnumIter, FromRepr};
+use strum_macros::{AsRefStr, EnumIter, FromRepr, VariantNames};
 use ts_control_utils::enums::BitEnum;
 
 // Generates `impl BitEnum<$t> for $enum_name` bodies that just cast `self` to
@@ -52,6 +52,23 @@ impl_bit_enum!(u16 =>
     ZoneStatusChiller,
 );
 impl_bit_enum!(u8 => PumpIdRecirculationPump);
+
+/// Command status.
+#[derive(Debug, PartialEq, VariantNames, AsRefStr)]
+pub enum CommandStatus {
+    Success,
+    Fail,
+    Ack,
+    NoAck,
+}
+
+/// Commander status.
+#[derive(FromRepr, Debug, PartialEq, Clone, Copy, Hash, Eq, VariantNames, AsRefStr)]
+#[repr(u8)]
+pub enum Commander {
+    CSC,
+    GUI,
+}
 
 // Although the name is motor status, it looks more like the motor error
 // status. Keep this name to be consistent with the user manual and existing

@@ -21,6 +21,7 @@
 
 pub mod chiller;
 pub mod data_acquisition;
+pub mod data_acquisition_process;
 pub mod flowmeter;
 pub mod modbus_communicator;
 pub mod pier_fan;

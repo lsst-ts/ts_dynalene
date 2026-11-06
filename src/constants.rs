@@ -193,3 +193,6 @@ pub const NUM_CMV: usize = 3;
 
 // Number of the tank.
 pub const NUM_TANK: usize = 2;
+
+// Bound for the synchronous channel.
+pub const BOUND_SYNC_CHANNEL: usize = 100;

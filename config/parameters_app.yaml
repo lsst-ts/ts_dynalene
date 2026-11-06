@@ -1,6 +1,9 @@
 ---
 # Application parameters
 
+# The frequency of data acquisition (DAQ) loop in Hz.
+frequency_loop: 20.0
+
 # There are no Modbus addresses for the temperature hubs actually.
 # However, we still document them here to be consistent with other sensors.
 #
