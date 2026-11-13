@@ -32,15 +32,13 @@ use ts_control_utils::tcp_server::TcpServer;
 
 pub struct CommandServer {
     // Sender of the messages to the TCP/IP.
-    _sender_to_tcp: SyncSender<Vec<Value>>,
+    sender_to_tcp: SyncSender<Vec<Value>>,
     // Receiver of the messages to the TCP/IP.
     pub receiver_to_tcp: Receiver<Vec<Value>>,
     // Sender of the messages from the TCP/IP.
     pub sender_from_tcp: SyncSender<CommandFormat>,
-    // List of the registered commands.
-    _commands: Vec<String>,
     // Last sequence ID.
-    _last_sequence_id: i64,
+    last_sequence_id: i64,
 }
 
 impl CommandServer {
@@ -55,14 +53,12 @@ impl CommandServer {
         let (sender_to_tcp, receiver_to_tcp) = sync_channel(BOUND_SYNC_CHANNEL);
 
         Self {
-            _sender_to_tcp: sender_to_tcp,
+            sender_to_tcp,
             receiver_to_tcp,
 
             sender_from_tcp: sender.clone(),
 
-            _commands: Vec::new(),
-
-            _last_sequence_id: -1,
+            last_sequence_id: -1,
         }
     }
 
@@ -71,12 +67,12 @@ impl CommandServer {
     /// # Returns
     /// Sender.
     pub fn get_sender_to_tcp(&self) -> SyncSender<Vec<Value>> {
-        self._sender_to_tcp.clone()
+        self.sender_to_tcp.clone()
     }
 
     /// Reset the sequence ID.
     pub fn reset_sequence_id(&mut self) {
-        self._last_sequence_id = -1;
+        self.last_sequence_id = -1;
     }
 
     /// Check the sequence ID.
@@ -87,19 +83,19 @@ impl CommandServer {
     /// # Returns
     /// Lost sequence IDs.
     pub fn check_sequence_id(&mut self, sequence_id: i64) -> Vec<i64> {
-        if self._last_sequence_id == -1 {
-            self._last_sequence_id = sequence_id;
+        if self.last_sequence_id == -1 {
+            self.last_sequence_id = sequence_id;
             return Vec::new();
         }
 
-        let expected_sequence_id = self._last_sequence_id + 1;
+        let expected_sequence_id = self.last_sequence_id + 1;
 
         let mut lost_sequence_ids = Vec::new();
         if sequence_id > expected_sequence_id {
             lost_sequence_ids = (expected_sequence_id..sequence_id).collect();
         }
 
-        self._last_sequence_id = sequence_id;
+        self.last_sequence_id = sequence_id;
 
         lost_sequence_ids
     }
@@ -231,11 +227,11 @@ mod tests {
     #[test]
     fn test_reset_sequence_id() {
         let mut command_server = create_command_server().0;
-        command_server._last_sequence_id = 5;
+        command_server.last_sequence_id = 5;
 
         command_server.reset_sequence_id();
 
-        assert_eq!(command_server._last_sequence_id, -1);
+        assert_eq!(command_server.last_sequence_id, -1);
     }
 
     #[test]
@@ -244,25 +240,25 @@ mod tests {
 
         // First connection
         assert_eq!(command_server.check_sequence_id(0), Vec::<i64>::new());
-        assert_eq!(command_server._last_sequence_id, 0);
+        assert_eq!(command_server.last_sequence_id, 0);
 
         assert_eq!(command_server.check_sequence_id(2), vec![1]);
-        assert_eq!(command_server._last_sequence_id, 2);
+        assert_eq!(command_server.last_sequence_id, 2);
 
         // Second connection
         command_server.reset_sequence_id();
 
         assert_eq!(command_server.check_sequence_id(5), Vec::<i64>::new());
-        assert_eq!(command_server._last_sequence_id, 5);
+        assert_eq!(command_server.last_sequence_id, 5);
 
         assert_eq!(command_server.check_sequence_id(6), Vec::<i64>::new());
-        assert_eq!(command_server._last_sequence_id, 6);
+        assert_eq!(command_server.last_sequence_id, 6);
 
         assert_eq!(command_server.check_sequence_id(9), vec![7, 8]);
-        assert_eq!(command_server._last_sequence_id, 9);
+        assert_eq!(command_server.last_sequence_id, 9);
 
         assert_eq!(command_server.check_sequence_id(10), Vec::<i64>::new());
-        assert_eq!(command_server._last_sequence_id, 10);
+        assert_eq!(command_server.last_sequence_id, 10);
     }
 
     #[test]
@@ -270,7 +266,7 @@ mod tests {
         let (mut command_server, _, receiver_from_tcp) = create_command_server();
 
         // Change the last sequence ID to simulate the previous connection.
-        command_server._last_sequence_id = 10;
+        command_server.last_sequence_id = 10;
 
         // Run the server.
         let sender_to_tcp = command_server.get_sender_to_tcp();

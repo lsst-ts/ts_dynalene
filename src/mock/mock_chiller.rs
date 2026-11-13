@@ -31,7 +31,7 @@ pub struct MockChiller {
     // Chiller.
     pub chiller: Chiller,
     // Heartbeat counter to simulate the heartbeat signal of the chiller.
-    _counter_heartbeat: u8,
+    counter_heartbeat: u8,
 }
 
 impl MockChiller {
@@ -57,7 +57,7 @@ impl MockChiller {
         Self {
             chiller,
 
-            _counter_heartbeat: 0,
+            counter_heartbeat: 0,
         }
     }
 
@@ -160,10 +160,10 @@ impl MockChiller {
     /// # Notes
     /// Call this function every second to properly trigger the heartbeat.
     pub fn trigger_heartbeat(&mut self) {
-        self._counter_heartbeat += 1;
+        self.counter_heartbeat += 1;
 
-        if self._counter_heartbeat >= 16 {
-            self._counter_heartbeat = 0;
+        if self.counter_heartbeat >= 16 {
+            self.counter_heartbeat = 0;
 
             self.chiller.heartbeat ^= HeartbeatChiller::SixteenSeconds.bit_value();
         }

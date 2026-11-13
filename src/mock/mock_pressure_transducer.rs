@@ -23,7 +23,7 @@ use crate::mock::mock_constants::PLANT_PRESSURE;
 
 pub struct MockPressureTransducer {
     // Address of the pressure transducer.
-    _address: u8,
+    address: u8,
     // Absolute pressure in PSI (0-100 PSI).
     pub pressure: f32,
 }
@@ -38,7 +38,7 @@ impl MockPressureTransducer {
     /// A new instance of `MockPressureTransducer`.
     pub fn new(address: u8) -> Self {
         Self {
-            _address: address,
+            address,
             pressure: PLANT_PRESSURE,
         }
     }
@@ -53,7 +53,7 @@ impl MockPressureTransducer {
     /// # Returns
     /// Payload of the measured pressure.
     pub fn request(&self) -> Vec<u8> {
-        format!("@{:03} {:07.3} PSI G\r\n", self._address, self.pressure)
+        format!("@{:03} {:07.3} PSI G\r\n", self.address, self.pressure)
             .as_bytes()
             .to_vec()
     }

@@ -24,7 +24,7 @@ use serde_json::Value;
 #[derive(Default)]
 pub struct EventQueue {
     // Events to publish
-    _events: Vec<Value>,
+    events: Vec<Value>,
 }
 
 impl EventQueue {
@@ -33,9 +33,7 @@ impl EventQueue {
     /// # Returns
     /// A new instance of the `EventQueue`.
     pub fn new() -> Self {
-        Self {
-            _events: Vec::new(),
-        }
+        Self { events: Vec::new() }
     }
 
     /// Check if there are any events to publish.
@@ -43,12 +41,12 @@ impl EventQueue {
     /// # Returns
     /// True if there are events to publish, false otherwise.
     pub fn has_event(&self) -> bool {
-        !self._events.is_empty()
+        !self.events.is_empty()
     }
 
     /// Add an event.
     pub fn add_event(&mut self, event: Value) {
-        self._events.push(event);
+        self.events.push(event);
     }
 
     /// Get the events to publish and clear the internal events.
@@ -56,8 +54,8 @@ impl EventQueue {
     /// # Returns
     /// Events.
     pub fn get_events_and_clear(&mut self) -> Vec<Value> {
-        let events = self._events.clone();
-        self._events.clear();
+        let events = self.events.clone();
+        self.events.clear();
 
         events
     }
@@ -92,7 +90,7 @@ mod tests {
         });
         event_queue.add_event(event);
 
-        assert_eq!(event_queue._events.len(), 1);
+        assert_eq!(event_queue.events.len(), 1);
     }
 
     #[test]
@@ -107,6 +105,6 @@ mod tests {
         let events = event_queue.get_events_and_clear();
 
         assert_eq!(events.len(), 1);
-        assert_eq!(event_queue._events.len(), 0);
+        assert_eq!(event_queue.events.len(), 0);
     }
 }

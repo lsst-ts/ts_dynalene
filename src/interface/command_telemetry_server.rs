@@ -39,25 +39,25 @@ use ts_control_utils::{constants::TERMINATOR, tcp_server::TcpServer};
 
 pub struct CommandTelemetryServer {
     // Name of the server.
-    _name: Commander,
+    name: Commander,
     // A string that holds the hostname or IP address.
-    _host: String,
+    host: String,
     // Port numbers
-    _ports: HashMap<String, i32>,
+    ports: HashMap<String, i32>,
     // Timeout in milliseconds.
     pub timeout: u64,
     // An Arc instance that holds the AtomicBool instance to stop the server.
-    _stop: Arc<AtomicBool>,
+    stop: Arc<AtomicBool>,
     // Sender of the commands from the TCP/IP.
-    _sender_from_tcp_command: SyncSender<CommandFormat>,
+    sender_from_tcp_command: SyncSender<CommandFormat>,
     // Sender of the events from the command telemetry server.
-    _sender_from_command_telemetry_server: SyncSender<Value>,
+    sender_from_command_telemetry_server: SyncSender<Value>,
     // Senders of the messages to the TCP/IP servers.
     pub senders_to_tcp: HashMap<String, Option<SyncSender<Vec<Value>>>>,
     // Server's connection status.
-    _connections: HashMap<String, Arc<AtomicBool>>,
+    connections: HashMap<String, Arc<AtomicBool>>,
     // Thread handles for the command and telemetry servers
-    _handles: Vec<JoinHandle<()>>,
+    handles: Vec<JoinHandle<()>>,
 }
 
 impl CommandTelemetryServer {
@@ -103,21 +103,21 @@ impl CommandTelemetryServer {
         senders_to_tcp.insert("telemetry".to_string(), None);
 
         Self {
-            _name: name,
+            name,
 
-            _host: String::from(host),
-            _ports: ports,
+            host: String::from(host),
+            ports,
             timeout,
 
-            _stop: stop.clone(),
+            stop: stop.clone(),
 
-            _sender_from_tcp_command: sender_command,
-            _sender_from_command_telemetry_server: sender_command_telemetry_server,
+            sender_from_tcp_command: sender_command,
+            sender_from_command_telemetry_server: sender_command_telemetry_server,
             senders_to_tcp,
 
-            _connections: connections,
+            connections,
 
-            _handles: Vec::new(),
+            handles: Vec::new(),
         }
     }
 
@@ -128,7 +128,7 @@ impl CommandTelemetryServer {
     /// The second integer is the telemetry port number.
     pub fn run_servers(&mut self) -> (i32, i32) {
         // Create the command and telemetry servers
-        let mut command_server = CommandServer::new(&self._sender_from_tcp_command);
+        let mut command_server = CommandServer::new(&self.sender_from_tcp_command);
         let mut telemetry_server = TelemetryServer::new();
 
         // Get the sender to the TCP/IP
@@ -142,32 +142,32 @@ impl CommandTelemetryServer {
         );
 
         // Create the TCP servers
-        let name_command_server = self._name.as_ref().to_string() + " CommandServer";
+        let name_command_server = self.name.as_ref().to_string() + " CommandServer";
         let mut tcp_server_command = TcpServer::new(
             &name_command_server,
-            &self._host,
-            self._ports["command"],
+            &self.host,
+            self.ports["command"],
             self.timeout,
             TERMINATOR.as_ref(),
-            &self._stop,
+            &self.stop,
         );
 
-        let name_telemetry_server = self._name.as_ref().to_string() + " TelemetryServer";
+        let name_telemetry_server = self.name.as_ref().to_string() + " TelemetryServer";
         let mut tcp_server_telemetry = TcpServer::new(
             &name_telemetry_server,
-            &self._host,
-            self._ports["telemetry"],
+            &self.host,
+            self.ports["telemetry"],
             self.timeout,
             TERMINATOR.as_ref(),
-            &self._stop,
+            &self.stop,
         );
 
         // Get the reference to check if the server is connected
-        self._connections.insert(
+        self.connections.insert(
             "command".to_string(),
             tcp_server_command.get_connection_status_reference(),
         );
-        self._connections.insert(
+        self.connections.insert(
             "telemetry".to_string(),
             tcp_server_telemetry.get_connection_status_reference(),
         );
@@ -193,8 +193,8 @@ impl CommandTelemetryServer {
             );
         });
 
-        self._handles.push(handle_command);
-        self._handles.push(handle_telemetry);
+        self.handles.push(handle_command);
+        self.handles.push(handle_telemetry);
 
         (port_command, port_telemetry)
     }
@@ -203,22 +203,22 @@ impl CommandTelemetryServer {
     pub fn run_monitor_loop(&mut self) {
         info!(
             "{} command-telemetry server starts to monitor the connection status.",
-            self._name.as_ref()
+            self.name.as_ref()
         );
 
         let mut are_connected = false;
-        while !self._stop.load(Ordering::Relaxed) {
+        while !self.stop.load(Ordering::Relaxed) {
             if self.are_connected() != are_connected {
                 are_connected = !are_connected;
 
                 if self
-                    ._sender_from_command_telemetry_server
+                    .sender_from_command_telemetry_server
                     .try_send(Event::get_message_tcp_ip_connected(are_connected))
                     .is_err()
                 {
                     info!(
                         "{} command-telemetry server failed to send the connection status.",
-                        self._name.as_ref()
+                        self.name.as_ref()
                     );
                 }
             }
@@ -230,7 +230,7 @@ impl CommandTelemetryServer {
 
         info!(
             "{} command-telemetry server stops the monitoring of connection status.",
-            self._name.as_ref()
+            self.name.as_ref()
         );
     }
 
@@ -240,15 +240,15 @@ impl CommandTelemetryServer {
     /// A boolean value. If the servers are connected, return true. Otherwise,
     /// return false.
     fn are_connected(&self) -> bool {
-        self._connections["command"].load(Ordering::Relaxed)
-            && self._connections["telemetry"].load(Ordering::Relaxed)
+        self.connections["command"].load(Ordering::Relaxed)
+            && self.connections["telemetry"].load(Ordering::Relaxed)
     }
 
     /// Stop the command and telemetry servers.
     fn stop(&mut self) {
-        self._stop.store(true, Ordering::Relaxed);
+        self.stop.store(true, Ordering::Relaxed);
 
-        for handle in self._handles.drain(..) {
+        for handle in self.handles.drain(..) {
             handle.join().expect("Server handle should join.");
         }
     }
@@ -331,7 +331,7 @@ mod tests {
 
         server.stop();
 
-        assert!(server._stop.load(Ordering::Relaxed));
+        assert!(server.stop.load(Ordering::Relaxed));
     }
 
     #[test]

@@ -33,7 +33,7 @@ use crate::utility::calculate_modbus_crc_and_update_frame;
 
 pub struct MockPowerGridMonitor {
     // Cyclic redundancy check (CRC) calculator for the Modbus communication.
-    _crc: Crc<u16>,
+    crc: Crc<u16>,
     // Power grid monitor.
     pub power_grid_monitor: PowerGridMonitor,
 }
@@ -58,7 +58,7 @@ impl MockPowerGridMonitor {
         power_grid_monitor.frequency = PLANT_POWER_GRID_MONITOR_FREQUENCY;
 
         Self {
-            _crc: Crc::<u16>::new(&CRC_16_MODBUS),
+            crc: Crc::<u16>::new(&CRC_16_MODBUS),
 
             power_grid_monitor,
         }
@@ -123,7 +123,7 @@ impl MockPowerGridMonitor {
                 .copy_from_slice(&self.power_grid_monitor.frequency.to_be_bytes());
         }
 
-        calculate_modbus_crc_and_update_frame(&self._crc, &mut frame_response);
+        calculate_modbus_crc_and_update_frame(&self.crc, &mut frame_response);
 
         frame_response
     }

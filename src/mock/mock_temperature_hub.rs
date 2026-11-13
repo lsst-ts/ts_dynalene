@@ -25,7 +25,7 @@ use crate::mock::mock_constants::PLANT_TEMPERATURE;
 #[derive(Default, Copy, Clone)]
 pub struct MockTemperatureHub {
     // Temperatures in degree Celsius.
-    _temperatures: [f32; NUM_TEMPERATURE_CHANNEL],
+    temperatures: [f32; NUM_TEMPERATURE_CHANNEL],
 }
 
 impl MockTemperatureHub {
@@ -35,7 +35,7 @@ impl MockTemperatureHub {
     /// A new instance of `MockTemperatureHub`.
     pub fn new() -> Self {
         Self {
-            _temperatures: [PLANT_TEMPERATURE; NUM_TEMPERATURE_CHANNEL],
+            temperatures: [PLANT_TEMPERATURE; NUM_TEMPERATURE_CHANNEL],
         }
     }
 
@@ -46,7 +46,7 @@ impl MockTemperatureHub {
     ///   the mock temperature hub. The length of the array must be equal to
     ///   `NUM_TEMPERATURE_CHANNEL`.
     pub fn set_temperatures(&mut self, temperatures: &[f32; NUM_TEMPERATURE_CHANNEL]) {
-        self._temperatures = *temperatures;
+        self.temperatures = *temperatures;
     }
 
     /// Get the temperatures.
@@ -54,7 +54,7 @@ impl MockTemperatureHub {
     /// # Returns
     /// An array of temperatures in degree Celsius.
     pub fn get_temperatures(&self) -> [f32; NUM_TEMPERATURE_CHANNEL] {
-        self._temperatures
+        self.temperatures
     }
 
     /// Request the ModBus payload of the measured temperatures.
@@ -70,7 +70,7 @@ impl MockTemperatureHub {
     /// Payload of the measured temperatures.
     pub fn request(&self) -> Vec<u8> {
         let mut temperatures = String::new();
-        for (idx, temperature) in self._temperatures.iter().enumerate() {
+        for (idx, temperature) in self.temperatures.iter().enumerate() {
             if idx > 0 {
                 temperatures.push(',');
             }

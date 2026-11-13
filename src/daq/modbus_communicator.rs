@@ -47,7 +47,7 @@ use crate::utility::{calculate_modbus_crc_and_update_frame, verify_modbus_crc};
 
 pub struct ModbusCommunicator {
     // Cyclic redundancy check (CRC) calculator for the Modbus communication.
-    _crc: Crc<u16>,
+    crc: Crc<u16>,
 }
 
 impl Default for ModbusCommunicator {
@@ -66,9 +66,7 @@ impl ModbusCommunicator {
         // is precomputed and stored in the constant.
         const CRC_ALGORITHM: Crc<u16> = Crc::<u16>::new(&CRC_16_MODBUS);
 
-        Self {
-            _crc: CRC_ALGORITHM,
-        }
+        Self { crc: CRC_ALGORITHM }
     }
 
     /// Create a frame to read the flowmeter.
@@ -227,7 +225,7 @@ impl ModbusCommunicator {
         frame[2..4].copy_from_slice(&register_address.to_be_bytes());
         frame[4..6].copy_from_slice(&num_register_or_value.to_be_bytes());
 
-        calculate_modbus_crc_and_update_frame(&self._crc, &mut frame);
+        calculate_modbus_crc_and_update_frame(&self.crc, &mut frame);
 
         frame
     }
@@ -295,7 +293,7 @@ impl ModbusCommunicator {
     /// # Returns
     /// A `Flowmeter` instance if the frame is valid. Otherwise, `None`.
     pub fn read_flowmeter_from_frame(&self, frame: &[u8]) -> Option<Flowmeter> {
-        if !verify_modbus_crc(&self._crc, frame) {
+        if !verify_modbus_crc(&self.crc, frame) {
             return None;
         }
 
@@ -310,7 +308,7 @@ impl ModbusCommunicator {
     /// # Returns
     /// A `PowerGridMonitor` instance if the frame is valid. Otherwise, `None`.
     pub fn read_power_grid_monitor_from_frame(&self, frame: &[u8]) -> Option<PowerGridMonitor> {
-        if !verify_modbus_crc(&self._crc, frame) {
+        if !verify_modbus_crc(&self.crc, frame) {
             return None;
         }
 
@@ -327,7 +325,7 @@ impl ModbusCommunicator {
     /// The maximum speed of the pier fan in rpm if the frame is valid.
     /// Otherwise, `None`.
     pub fn read_pier_fan_max_speed_from_frame(&self, frame: &[u8]) -> Option<f32> {
-        if !verify_modbus_crc(&self._crc, frame) {
+        if !verify_modbus_crc(&self.crc, frame) {
             return None;
         }
 
@@ -348,7 +346,7 @@ impl ModbusCommunicator {
         &self,
         frame: &[u8],
     ) -> Option<(f32, f32)> {
-        if !verify_modbus_crc(&self._crc, frame) {
+        if !verify_modbus_crc(&self.crc, frame) {
             return None;
         }
 
@@ -376,7 +374,7 @@ impl ModbusCommunicator {
         ref_dc_link_current: f32,
         frame: &[u8],
     ) -> Option<PierFan> {
-        if !verify_modbus_crc(&self._crc, frame) {
+        if !verify_modbus_crc(&self.crc, frame) {
             return None;
         }
 
@@ -402,10 +400,10 @@ impl ModbusCommunicator {
         frame_status: &[u8],
         frame_data: &[u8],
     ) -> Option<RecirculationPump> {
-        if (!verify_modbus_crc(&self._crc, frame_cim_configuration))
-            || (!verify_modbus_crc(&self._crc, frame_control))
-            || (!verify_modbus_crc(&self._crc, frame_status))
-            || (!verify_modbus_crc(&self._crc, frame_data))
+        if (!verify_modbus_crc(&self.crc, frame_cim_configuration))
+            || (!verify_modbus_crc(&self.crc, frame_control))
+            || (!verify_modbus_crc(&self.crc, frame_status))
+            || (!verify_modbus_crc(&self.crc, frame_data))
         {
             return None;
         }
