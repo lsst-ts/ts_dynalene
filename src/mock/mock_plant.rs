@@ -513,48 +513,70 @@ impl MockPlant {
                     self.digital_inputs_mod4 |= DigitalInputMod4::CloseFeedbackMov5.bit_value();
                 }
             }
-            DigitalOutput::PowerRecirculationPump1 => {
-                if switch_on {
+            DigitalOutput::PowerRecirculationPump1 if !switch_on => {
+                self.digital_inputs_mod4 &= !DigitalInputMod4::StatusK1.bit_value();
+            }
+            DigitalOutput::StartRecirculationPump1 => {
+                if switch_on
+                    & (self.digital_outputs & DigitalOutput::PowerRecirculationPump1.bit_value()
+                        != 0)
+                {
                     self.digital_inputs_mod4 |= DigitalInputMod4::StatusK1.bit_value();
                 } else {
                     self.digital_inputs_mod4 &= !DigitalInputMod4::StatusK1.bit_value();
                 }
             }
-
-            DigitalOutput::PowerRecirculationPump2 => {
-                if switch_on {
+            DigitalOutput::PowerRecirculationPump2 if !switch_on => {
+                self.digital_inputs_mod4 &= !DigitalInputMod4::StatusK2.bit_value();
+            }
+            DigitalOutput::StartRecirculationPump2 => {
+                if switch_on
+                    & (self.digital_outputs & DigitalOutput::PowerRecirculationPump2.bit_value()
+                        != 0)
+                {
                     self.digital_inputs_mod4 |= DigitalInputMod4::StatusK2.bit_value();
                 } else {
                     self.digital_inputs_mod4 &= !DigitalInputMod4::StatusK2.bit_value();
                 }
             }
-
-            DigitalOutput::PowerPierFan1 => {
+            DigitalOutput::PowerPierFan1 if !switch_on => {
+                self.digital_inputs_mod7 &= !DigitalInputMod7::StatusK3.bit_value();
+            }
+            DigitalOutput::PowerPierFan2 if !switch_on => {
+                self.digital_inputs_mod7 &= !DigitalInputMod7::StatusK4.bit_value();
+            }
+            DigitalOutput::FanEnable => {
                 if switch_on {
-                    self.digital_inputs_mod7 |= DigitalInputMod7::StatusK3.bit_value();
+                    if self.digital_outputs & DigitalOutput::PowerPierFan1.bit_value() != 0 {
+                        self.digital_inputs_mod7 |= DigitalInputMod7::StatusK3.bit_value();
+                    }
+                    if self.digital_outputs & DigitalOutput::PowerPierFan2.bit_value() != 0 {
+                        self.digital_inputs_mod7 |= DigitalInputMod7::StatusK4.bit_value();
+                    }
                 } else {
                     self.digital_inputs_mod7 &= !DigitalInputMod7::StatusK3.bit_value();
-                }
-            }
-
-            DigitalOutput::PowerPierFan2 => {
-                if switch_on {
-                    self.digital_inputs_mod7 |= DigitalInputMod7::StatusK4.bit_value();
-                } else {
                     self.digital_inputs_mod7 &= !DigitalInputMod7::StatusK4.bit_value();
                 }
             }
-
-            DigitalOutput::PowerChiller1 => {
-                if switch_on {
+            DigitalOutput::PowerChiller1 if !switch_on => {
+                self.digital_inputs_mod4 &= !DigitalInputMod4::StatusK21.bit_value();
+            }
+            DigitalOutput::StartChiller1 => {
+                if switch_on
+                    & (self.digital_outputs & DigitalOutput::PowerChiller1.bit_value() != 0)
+                {
                     self.digital_inputs_mod4 |= DigitalInputMod4::StatusK21.bit_value();
                 } else {
                     self.digital_inputs_mod4 &= !DigitalInputMod4::StatusK21.bit_value();
                 }
             }
-
-            DigitalOutput::PowerChiller2 => {
-                if switch_on {
+            DigitalOutput::PowerChiller2 if !switch_on => {
+                self.digital_inputs_mod4 &= !DigitalInputMod4::StatusK22.bit_value();
+            }
+            DigitalOutput::StartChiller2 => {
+                if switch_on
+                    & (self.digital_outputs & DigitalOutput::PowerChiller2.bit_value() != 0)
+                {
                     self.digital_inputs_mod4 |= DigitalInputMod4::StatusK22.bit_value();
                 } else {
                     self.digital_inputs_mod4 &= !DigitalInputMod4::StatusK22.bit_value();
@@ -948,6 +970,9 @@ mod tests {
             plant.digital_outputs,
             DigitalOutput::OpenMov5.bit_value() + DigitalOutput::PowerPierFan1.bit_value()
         );
+
+        // Another digital output to enable the fan
+        plant.switch_digital_output(DigitalOutput::FanEnable, true);
         assert!(plant.digital_inputs_mod7 & DigitalInputMod7::StatusK3.bit_value() != 0);
 
         // Switch off the first digital output to ensure it is turned off
@@ -955,7 +980,7 @@ mod tests {
         plant.switch_digital_output(DigitalOutput::OpenMov5, false);
         assert_eq!(
             plant.digital_outputs,
-            DigitalOutput::PowerPierFan1.bit_value()
+            DigitalOutput::PowerPierFan1.bit_value() + DigitalOutput::FanEnable.bit_value()
         );
 
         // Switch off a digital output that is already off to ensure no change
@@ -963,11 +988,12 @@ mod tests {
         plant.switch_digital_output(DigitalOutput::OpenMov5, false);
         assert_eq!(
             plant.digital_outputs,
-            DigitalOutput::PowerPierFan1.bit_value()
+            DigitalOutput::PowerPierFan1.bit_value() + DigitalOutput::FanEnable.bit_value()
         );
 
-        // Switch off the last remaining digital output to ensure all outputs
-        // are off
+        // Switch off the remaining digital outputs to ensure all outputs are
+        // off
+        plant.switch_digital_output(DigitalOutput::FanEnable, false);
         plant.switch_digital_output(DigitalOutput::PowerPierFan1, false);
         assert_eq!(plant.digital_outputs, 0);
         assert!(plant.digital_inputs_mod7 & DigitalInputMod7::StatusK3.bit_value() == 0);
@@ -977,39 +1003,64 @@ mod tests {
     fn test_update_digital_inputs() {
         let mut plant = MockPlant::new();
 
-        plant.update_digital_inputs(DigitalOutput::PowerRecirculationPump1, true);
+        plant.switch_digital_output(DigitalOutput::PowerRecirculationPump1, true);
+        plant.update_digital_inputs(DigitalOutput::StartRecirculationPump1, true);
         assert!(plant.digital_inputs_mod4 & DigitalInputMod4::StatusK1.bit_value() != 0);
 
+        plant.update_digital_inputs(DigitalOutput::StartRecirculationPump1, false);
+        assert!(plant.digital_inputs_mod4 & DigitalInputMod4::StatusK1.bit_value() == 0);
+
+        plant.update_digital_inputs(DigitalOutput::StartRecirculationPump1, true);
         plant.update_digital_inputs(DigitalOutput::PowerRecirculationPump1, false);
         assert!(plant.digital_inputs_mod4 & DigitalInputMod4::StatusK1.bit_value() == 0);
 
-        plant.update_digital_inputs(DigitalOutput::PowerRecirculationPump2, true);
+        plant.switch_digital_output(DigitalOutput::PowerRecirculationPump2, true);
+        plant.update_digital_inputs(DigitalOutput::StartRecirculationPump2, true);
         assert!(plant.digital_inputs_mod4 & DigitalInputMod4::StatusK2.bit_value() != 0);
 
+        plant.update_digital_inputs(DigitalOutput::StartRecirculationPump2, false);
+        assert!(plant.digital_inputs_mod4 & DigitalInputMod4::StatusK2.bit_value() == 0);
+
+        plant.update_digital_inputs(DigitalOutput::StartRecirculationPump2, true);
         plant.update_digital_inputs(DigitalOutput::PowerRecirculationPump2, false);
         assert!(plant.digital_inputs_mod4 & DigitalInputMod4::StatusK2.bit_value() == 0);
 
-        plant.update_digital_inputs(DigitalOutput::PowerPierFan1, true);
+        plant.switch_digital_output(DigitalOutput::PowerPierFan1, true);
+        plant.switch_digital_output(DigitalOutput::PowerPierFan2, true);
+        plant.update_digital_inputs(DigitalOutput::FanEnable, true);
         assert!(plant.digital_inputs_mod7 & DigitalInputMod7::StatusK3.bit_value() != 0);
-
-        plant.update_digital_inputs(DigitalOutput::PowerPierFan1, false);
-        assert!(plant.digital_inputs_mod7 & DigitalInputMod7::StatusK3.bit_value() == 0);
-
-        plant.update_digital_inputs(DigitalOutput::PowerPierFan2, true);
         assert!(plant.digital_inputs_mod7 & DigitalInputMod7::StatusK4.bit_value() != 0);
 
-        plant.update_digital_inputs(DigitalOutput::PowerPierFan2, false);
+        plant.update_digital_inputs(DigitalOutput::FanEnable, false);
+        assert!(plant.digital_inputs_mod7 & DigitalInputMod7::StatusK3.bit_value() == 0);
         assert!(plant.digital_inputs_mod7 & DigitalInputMod7::StatusK4.bit_value() == 0);
 
-        plant.update_digital_inputs(DigitalOutput::PowerChiller1, true);
+        plant.update_digital_inputs(DigitalOutput::FanEnable, true);
+        plant.switch_digital_output(DigitalOutput::PowerPierFan1, false);
+        assert!(plant.digital_inputs_mod7 & DigitalInputMod7::StatusK3.bit_value() == 0);
+
+        plant.switch_digital_output(DigitalOutput::PowerPierFan2, false);
+        assert!(plant.digital_inputs_mod7 & DigitalInputMod7::StatusK4.bit_value() == 0);
+
+        plant.switch_digital_output(DigitalOutput::PowerChiller1, true);
+        plant.update_digital_inputs(DigitalOutput::StartChiller1, true);
         assert!(plant.digital_inputs_mod4 & DigitalInputMod4::StatusK21.bit_value() != 0);
 
+        plant.update_digital_inputs(DigitalOutput::StartChiller1, false);
+        assert!(plant.digital_inputs_mod4 & DigitalInputMod4::StatusK21.bit_value() == 0);
+
+        plant.update_digital_inputs(DigitalOutput::StartChiller1, true);
         plant.update_digital_inputs(DigitalOutput::PowerChiller1, false);
         assert!(plant.digital_inputs_mod4 & DigitalInputMod4::StatusK21.bit_value() == 0);
 
-        plant.update_digital_inputs(DigitalOutput::PowerChiller2, true);
+        plant.switch_digital_output(DigitalOutput::PowerChiller2, true);
+        plant.update_digital_inputs(DigitalOutput::StartChiller2, true);
         assert!(plant.digital_inputs_mod4 & DigitalInputMod4::StatusK22.bit_value() != 0);
 
+        plant.update_digital_inputs(DigitalOutput::StartChiller2, false);
+        assert!(plant.digital_inputs_mod4 & DigitalInputMod4::StatusK22.bit_value() == 0);
+
+        plant.update_digital_inputs(DigitalOutput::StartChiller2, true);
         plant.update_digital_inputs(DigitalOutput::PowerChiller2, false);
         assert!(plant.digital_inputs_mod4 & DigitalInputMod4::StatusK22.bit_value() == 0);
     }

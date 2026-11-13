@@ -1635,19 +1635,28 @@ mod tests {
         let _ = data_acquisition.switch_digital_output(DigitalOutput::OpenMov1, true);
         let _ = data_acquisition.switch_digital_output(DigitalOutput::PowerPierFan1, true);
         let _ = data_acquisition.switch_digital_output(DigitalOutput::PowerPierFan2, true);
+        let _ = data_acquisition.switch_digital_output(DigitalOutput::FanEnable, true);
+
         let _ = data_acquisition.switch_digital_output(DigitalOutput::PowerChiller1, true);
         let _ = data_acquisition.switch_digital_output(DigitalOutput::PowerChiller2, true);
+        let _ = data_acquisition.switch_digital_output(DigitalOutput::StartChiller1, true);
+        let _ = data_acquisition.switch_digital_output(DigitalOutput::StartChiller2, true);
+
         let _ =
             data_acquisition.switch_digital_output(DigitalOutput::PowerRecirculationPump1, true);
         let _ =
             data_acquisition.switch_digital_output(DigitalOutput::PowerRecirculationPump2, true);
+        let _ =
+            data_acquisition.switch_digital_output(DigitalOutput::StartRecirculationPump1, true);
+        let _ =
+            data_acquisition.switch_digital_output(DigitalOutput::StartRecirculationPump2, true);
 
         // Get the telemetry
         let telemetry = data_acquisition.get_telemetry();
 
         assert_eq!(telemetry.digital_inputs_mod4, 62121);
         assert_eq!(telemetry.digital_inputs_mod7, 3);
-        assert_eq!(telemetry.digital_outputs, 2013266689);
+        assert_eq!(telemetry.digital_outputs, 2029060865);
 
         assert_eq!(telemetry.temperatures[0], PLANT_TEMPERATURE as f64);
         assert_eq!(telemetry.pressures[0], PLANT_PRESSURE as f64);
