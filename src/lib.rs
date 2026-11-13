@@ -31,5 +31,6 @@ pub mod enums;
 pub mod event_queue;
 pub mod interface;
 pub mod mock;
+pub mod status;
 pub mod telemetry;
 pub mod utility;
