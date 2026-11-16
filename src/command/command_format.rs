@@ -53,6 +53,9 @@ pub enum CommandPayload {
     #[serde(rename = "cmd_setChillerTemperature")]
     #[strum(serialize = "cmd_setChillerTemperature")]
     SetChillerTemperature(ParametersSetChillerTemperature),
+    #[serde(rename = "cmd_switchCommandSource")]
+    #[strum(serialize = "cmd_switchCommandSource")]
+    SwitchCommandSource(ParametersSwitchCommandSource),
 }
 
 impl CommandPayload {
@@ -112,6 +115,12 @@ pub struct ParametersSetChillerTemperature {
     pub temperature: f32,
 }
 
+#[derive(Deserialize, PartialEq)]
+pub struct ParametersSwitchCommandSource {
+    // True if the command source should be switched to CSC, false for GUI.
+    pub remote: bool,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -145,5 +154,9 @@ mod tests {
             temperature: 25.0,
         });
         assert_eq!(payload.get_tag_id(), "cmd_setChillerTemperature");
+
+        let payload =
+            CommandPayload::SwitchCommandSource(ParametersSwitchCommandSource { remote: true });
+        assert_eq!(payload.get_tag_id(), "cmd_switchCommandSource");
     }
 }
