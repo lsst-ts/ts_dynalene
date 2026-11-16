@@ -200,7 +200,9 @@ impl DataAcquisitionProcess {
     /// # Returns
     /// The command result, or None if it's an internal command.
     fn execute_and_check_internal_command(&mut self, message: &CommandFormat) -> Option<Value> {
-        let result = self.command_schema.execute(message, Some(&mut self.daq));
+        let result = self
+            .command_schema
+            .execute(message, Some(&mut self.daq), None);
 
         // For the internal command, no need to send the result.
         let is_internal_command = message.sequence_id == -1;

@@ -23,6 +23,7 @@ use crate::command::{
     command_format::{CommandFormat, CommandId, CommandPayload},
     command_schema::Command,
 };
+use crate::controller::Controller;
 use crate::daq::data_acquisition::DataAcquisition;
 use crate::enums::DigitalOutput;
 
@@ -37,6 +38,7 @@ impl Command for CommandSwitchDigitalOutput {
         &self,
         message: &CommandFormat,
         data_acquisition: Option<&mut DataAcquisition>,
+        _controller: Option<&mut Controller>,
     ) -> Result<(), String> {
         if let CommandPayload::SwitchDigitalOutput(parameters) = &message.payload {
             let digital_output =
@@ -61,6 +63,7 @@ impl Command for CommandOpenPressureControlValve {
         &self,
         message: &CommandFormat,
         data_acquisition: Option<&mut DataAcquisition>,
+        _controller: Option<&mut Controller>,
     ) -> Result<(), String> {
         if let CommandPayload::OpenPressureControlValve(parameters) = &message.payload {
             let system = data_acquisition.ok_or("Missing data acquisition.")?;
@@ -82,6 +85,7 @@ impl Command for CommandOpenControlMixingValve {
         &self,
         message: &CommandFormat,
         data_acquisition: Option<&mut DataAcquisition>,
+        _controller: Option<&mut Controller>,
     ) -> Result<(), String> {
         if let CommandPayload::OpenControlMixingValve(parameters) = &message.payload {
             let system = data_acquisition.ok_or("Missing data acquisition.")?;
@@ -103,6 +107,7 @@ impl Command for CommandResetPierFan {
         &self,
         message: &CommandFormat,
         data_acquisition: Option<&mut DataAcquisition>,
+        _controller: Option<&mut Controller>,
     ) -> Result<(), String> {
         if let CommandPayload::ResetPierFan(parameters) = &message.payload {
             let system = data_acquisition.ok_or("Missing data acquisition.")?;
@@ -124,6 +129,7 @@ impl Command for CommandSetChillerTemperature {
         &self,
         message: &CommandFormat,
         data_acquisition: Option<&mut DataAcquisition>,
+        _controller: Option<&mut Controller>,
     ) -> Result<(), String> {
         if let CommandPayload::SetChillerTemperature(parameters) = &message.payload {
             let system = data_acquisition.ok_or("Missing data acquisition.")?;
@@ -158,6 +164,7 @@ mod tests {
                     }))
                     .unwrap(),
                     Some(&mut data_acquisition),
+                    None,
                 )
                 .is_ok()
         );
@@ -186,6 +193,7 @@ mod tests {
                     }))
                     .unwrap(),
                     Some(&mut data_acquisition),
+                    None,
                 )
                 .is_ok()
         );
@@ -208,6 +216,7 @@ mod tests {
                     }))
                     .unwrap(),
                     Some(&mut data_acquisition),
+                    None,
                 )
                 .is_ok()
         );
@@ -230,6 +239,7 @@ mod tests {
                     }))
                     .unwrap(),
                     Some(&mut data_acquisition),
+                    None,
                 )
                 .is_ok()
         );
@@ -251,6 +261,7 @@ mod tests {
                 }))
                 .unwrap(),
                 Some(&mut data_acquisition),
+                None,
             ),
             Err(String::from("Chiller is not enabled.")),
         );
