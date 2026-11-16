@@ -52,6 +52,48 @@ impl Event {
             "name": commander.as_ref().to_lowercase(),
         })
     }
+
+    /// Get the message of the digital inputs of Mod4, NI-9425.
+    ///
+    /// # Arguments
+    /// * `digital_inputs` - Digital inputs.
+    ///
+    /// # Returns
+    /// The message of the digital inputs.
+    pub fn get_message_digital_inputs_mod4(digital_inputs: u32) -> Value {
+        json!({
+            "id": "digitalInputsMod4",
+            "value": digital_inputs,
+        })
+    }
+
+    /// Get the message of the digital inputs of Mod7, NI-9425.
+    ///
+    /// # Arguments
+    /// * `digital_inputs` - Digital inputs.
+    ///
+    /// # Returns
+    /// The message of the digital inputs.
+    pub fn get_message_digital_inputs_mod7(digital_inputs: u32) -> Value {
+        json!({
+            "id": "digitalInputsMod7",
+            "value": digital_inputs,
+        })
+    }
+
+    /// Get the message of the digital outputs (Mod6, NI-9476).
+    ///
+    /// # Arguments
+    /// * `digital_outputs` - Digital outputs.
+    ///
+    /// # Returns
+    /// The message of the digital outputs.
+    pub fn get_message_digital_outputs(digital_outputs: u32) -> Value {
+        json!({
+            "id": "digitalOutputs",
+            "value": digital_outputs,
+        })
+    }
 }
 
 #[cfg(test)]
@@ -76,6 +118,39 @@ mod tests {
             json!({
                 "id": "commander",
                 "name": "csc",
+            })
+        );
+    }
+
+    #[test]
+    fn test_get_message_digital_inputs_mod4() {
+        assert_eq!(
+            Event::get_message_digital_inputs_mod4(1),
+            json!({
+                "id": "digitalInputsMod4",
+                "value": 1,
+            })
+        );
+    }
+
+    #[test]
+    fn test_get_message_digital_inputs_mod7() {
+        assert_eq!(
+            Event::get_message_digital_inputs_mod7(1),
+            json!({
+                "id": "digitalInputsMod7",
+                "value": 1,
+            })
+        );
+    }
+
+    #[test]
+    fn test_get_message_digital_outputs() {
+        assert_eq!(
+            Event::get_message_digital_outputs(1),
+            json!({
+                "id": "digitalOutputs",
+                "value": 1,
             })
         );
     }
