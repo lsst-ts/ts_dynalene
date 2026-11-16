@@ -26,6 +26,7 @@
 pub mod command;
 pub mod config;
 pub mod constants;
+pub mod controller;
 pub mod daq;
 pub mod enums;
 pub mod event_queue;
