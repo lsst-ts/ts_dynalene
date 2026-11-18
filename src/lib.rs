@@ -23,6 +23,7 @@
 //!
 //! This library is a collection of control system for the Dynalene
 //! control system.
+pub mod application;
 pub mod command;
 pub mod config;
 pub mod constants;
