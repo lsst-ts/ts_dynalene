@@ -13,8 +13,47 @@ Show the main class diagram below:
 ```mermaid
 classDiagram
 
-class Config
-class EventQueue
+namespace telemetry {
+  class Event
+  class Telemetry
+  class TelemetryDataAcquisition
+}
+
+Telemetry o-- TelemetryDataAcquisition
+
+namespace command {
+  class CommandSchema
+  class CommandFormat
+  class CommandController
+  class CommandDataAcquisition
+}
+
+CommandSchema *-- CommandController
+
+namespace daq {
+  class DataAcquisitionProcess
+}
+
+namespace interface {
+  class CommandTelemetryServer
+}
+
+Model *-- Controller
+Model *-- CommandSchema
+Model ..> CommandFormat
+Model ..> CommandController
+Model ..> CommandDataAcquisition
+Model ..> Event
+Model ..> Telemetry
+Model ..> TelemetryDataAcquisition
+Model ..> CommandTelemetryServer
+Model ..> DataAcquisitionProcess
+
+Controller *-- Status
+Controller *-- EventQueue
+Controller *-- Telemetry
+Controller ..> Event
+Controller ..> CommandFormat
 ```
 
 ## Daq
@@ -143,6 +182,10 @@ The [command](../src/command/) module implements the command factory:
 ```mermaid
 classDiagram
 
+namespace main {
+  class Controller
+}
+
 namespace daq {
   class DataAcquisition
 }
@@ -150,9 +193,11 @@ namespace daq {
 CommandSchema "1" *-- "n" Command
 CommandSchema ..> CommandFormat
 
+Command --> Controller
 Command --> DataAcquisition
 Command ..> CommandFormat
 
+Command <|-- CommandController
 Command <|-- CommandDataAcquisition
 ```
 

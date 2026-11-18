@@ -41,16 +41,72 @@ You can get the [Modbus document](https://www.advantageengineering.com/fyi/325/a
 ## Development Environment
 
 You can develop the code under the Windows, Mac, and Linux.
+For the Windows and Mac, disable all the features by default.
+For the Linux, if you have the realtime support in OS, you can enable the `realtime` feature.
+
+## Install the Rust in cRIO and Run the Application
+
+Follow [here](https://www.rust-lang.org/tools/install) to install the Rust in cRIO.
+
+To run the application in the simulation mode by `cargo`, do:
+
+```bash
+cargo run -- -s
+```
+
+If you are using the cRIO simulator, you can do the following instead:
+
+```bash
+cargo run --features realtime -- -s
+```
+
+You can interrupt the running application by `ctrl` + `c`.
+
+To get more information, do:
+
+```bash
+cargo run -- -h
+```
+
+## Executables
+
+The followings are the executables:
+
+- [main](src/main.rs): Dynalene controller.
+
+## Build the Executable
+
+For the cRIO simulator, do the following (to enable the `realtime` feature is optional):
+
+```bash
+cargo build --release --features realtime
+```
+
+This will generate an optimized executable in the `target/release/` directory, which is suitable for distribution.
+
+## Deployment
+
+The details can follow [deployment](doc/deployment.md).
 
 ## Configuration Files
 
 See the [config/](config) directory for the configuration files:
 
 - [parameters_app.yaml](config/parameters_app.yaml) is the configuration of application.
+- [logspecification.toml](config/logspecification.toml) assigns the log level.
+
+## Script
+
+Some useful scripts are in `script/` directory.
+
+1. `dynalene`: Initialization file in the Linux system.
 
 ## Log Data
 
 The logging files are in the `log/` directory.
+You can change the log level in the runtime by modifying the [logspecification.toml](config/logspecification.toml).
+The logging files are rotated, and the related parameters are in the [parameters_app.yaml](config/parameters_app.yaml).
+You can adjust the log level of each module individually.
 
 ## Code Format
 
