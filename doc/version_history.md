@@ -1,5 +1,18 @@
 # Version History
 
+0.1.7
+
+- Remove the underscore of fields.
+- Change the package name and add the **features** to `Cargo.toml`.
+- Add the dependencies of `flexi_logger`, `libc`, `signal-hook`, and `clap`.
+- Update the `parameters_app.yaml`, `README.md`, and `class_diagram.md`.
+- Add the `logspecification.toml`, `dynalene` script, `deployment.md`, and `communication_diagram.md`.
+- Report the instrument status after starting the instrument in `MockPlant.update_digital_inputs()`.
+- Fix the `TelemetryServer.process_telemetry()` to detect the close of connection from peer.
+- Add the classes of **Status**, **Controller**, **CommandSwitchCommandSource**, and **Model**.
+- Add the `application.rs`.
+- Update the `event.rs` and `command_format.rs`, and `main.rs`.
+
 0.1.6
 
 - Add the **CommandStatus** and **Commander** to `enums.rs`.
