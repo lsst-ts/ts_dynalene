@@ -344,7 +344,8 @@ mod tests {
         assert!(!server.are_connected());
 
         // Create the clients to connect the servers
-        let mut client_command = create_tcp_clients(port_command, port_telemetry).0;
+        let (mut client_command, _client_telemetry) =
+            create_tcp_clients(port_command, port_telemetry);
 
         sleep(Duration::from_millis(MAX_TIMEOUT));
         assert!(server.are_connected());

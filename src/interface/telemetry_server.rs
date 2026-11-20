@@ -67,6 +67,9 @@ impl TelemetryServer {
     /// * `tcp_server` - TCP server.
     /// * `telemetry_server` - Telemetry server.
     pub fn process_telemetry(tcp_server: &mut TcpServer, telemetry_server: &mut TelemetryServer) {
+        // Check the client closed the connection or not.
+        let _ = tcp_server.read_string();
+
         // Check the internal telemetry and send to the TCP/IP.
         if let Ok(telemetry_send) = telemetry_server
             .receiver_to_tcp
