@@ -45,7 +45,7 @@ use crate::utility::calculate_modbus_crc_and_update_frame;
 
 pub struct MockPierFan {
     // Cyclic redundancy check (CRC) calculator for the Modbus communication.
-    _crc: Crc<u16>,
+    crc: Crc<u16>,
     // The maximum speed of the pier fan in rpm.
     pub max_speed: u16,
     // The reference DC link voltage in mV.
@@ -81,7 +81,7 @@ impl MockPierFan {
         pier_fan.current_power = PLANT_PIER_FAN_CURRENT_POWER;
 
         Self {
-            _crc: Crc::<u16>::new(&CRC_16_MODBUS),
+            crc: Crc::<u16>::new(&CRC_16_MODBUS),
 
             max_speed: PLANT_PIER_FAN_MAX_SPEED,
             ref_dc_link_voltage: PLANT_PIER_FAN_REF_DC_LINK_VOLTAGE,
@@ -146,7 +146,7 @@ impl MockPierFan {
             frame_response[3..3 + (data_bytes as usize)].copy_from_slice(&frame_data);
         }
 
-        calculate_modbus_crc_and_update_frame(&self._crc, &mut frame_response);
+        calculate_modbus_crc_and_update_frame(&self.crc, &mut frame_response);
 
         frame_response
     }

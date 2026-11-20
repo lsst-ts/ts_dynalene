@@ -21,11 +21,11 @@
 
 pub struct TankLevel {
     // The maximum value of the sensor range.
-    _sensor_max_range: f64,
+    sensor_max_range: f64,
     // The distance for the full level of the tank.
-    _distance_full: f64,
+    distance_full: f64,
     // The distance for the empty level of the tank.
-    _distance_empty: f64,
+    distance_empty: f64,
 }
 
 impl TankLevel {
@@ -41,10 +41,10 @@ impl TankLevel {
     /// A new instance of `TankLevel`.
     pub fn new(sensor_max_range: f64, distance_full: f64, distance_empty: f64) -> Self {
         Self {
-            _sensor_max_range: sensor_max_range,
+            sensor_max_range,
 
-            _distance_full: distance_full,
-            _distance_empty: distance_empty,
+            distance_full,
+            distance_empty,
         }
     }
 
@@ -68,10 +68,10 @@ impl TankLevel {
     /// A tuple containing the distance and remaining percentage of the tank
     /// level.
     pub fn calculate_distance_and_percentage(&self, ratio: f64) -> (f64, f64) {
-        let measured_value = self._sensor_max_range * ratio;
-        let distance_to_full = measured_value - self._distance_full;
-        let remaining_percentage = (self._distance_empty - measured_value)
-            / (self._distance_empty - self._distance_full)
+        let measured_value = self.sensor_max_range * ratio;
+        let distance_to_full = measured_value - self.distance_full;
+        let remaining_percentage = (self.distance_empty - measured_value)
+            / (self.distance_empty - self.distance_full)
             * 100.0;
 
         (distance_to_full, remaining_percentage)
@@ -95,14 +95,14 @@ mod tests {
 
         // Zero
         let (distance_to_full, remaining_percentage) =
-            tank.calculate_distance_and_percentage(tank._distance_empty / tank._sensor_max_range);
+            tank.calculate_distance_and_percentage(tank.distance_empty / tank.sensor_max_range);
 
         assert_eq!(distance_to_full, 860.0);
         assert_eq!(remaining_percentage, 0.0);
 
         // Full
         let (distance_to_full, remaining_percentage) =
-            tank.calculate_distance_and_percentage(tank._distance_full / tank._sensor_max_range);
+            tank.calculate_distance_and_percentage(tank.distance_full / tank.sensor_max_range);
 
         assert_eq!(distance_to_full, 0.0);
         assert_eq!(remaining_percentage, 100.0);

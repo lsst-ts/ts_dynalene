@@ -1,7 +1,16 @@
 [package]
-name = "ts_dynalene"
-version = "0.1.0"
+name = "run_dynalene"
+version = "0.1.7"
 edition = "2024"
+
+[profile.dev]
+opt-level = 0
+
+[profile.release]
+opt-level = 3
+
+[features]
+realtime = ["dep:libc"]
 
 [dependencies]
 ts_control_utils = { git = "https://github.com/lsst-ts/ts_control_utils.git", branch = "develop" }
@@ -13,3 +22,7 @@ regex = "1.13.1"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 log = "0.4.34"
+flexi_logger = { version = "0.31.10", features = ["async", "specfile"] }
+libc = { version = "0.2.191", optional = true}
+signal-hook = "0.4.6"
+clap = { version = "4.6.8", features = ["cargo"] }

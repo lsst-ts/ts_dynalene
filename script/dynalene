@@ -1,0 +1,57 @@
+#!/bin/sh
+
+CONTROL_SYSTEM_DIR=/home/admin/github/ts_dynalene
+EXECUTABLE=${CONTROL_SYSTEM_DIR}/target/release/run_dynalene
+
+# Define functions
+start() {
+  echo "Starting Dynalene control system. Sleep 30 seconds to allow it to boot up."
+  # Simulation mode with "-s".
+  nohup ${EXECUTABLE} -s > /dev/null 2>&1 &
+  sleep 30
+}
+
+stop() {
+  echo "Stopping Dynalene control system..."
+  pkill -x run_dynalene
+  echo "Sleeping for 10 seconds to allow the Dynalene control system to stop."
+  sleep 10
+}
+
+restart() {
+  stop
+  sleep 10
+  start
+}
+
+status() {
+  process_id=$(pgrep -x run_dynalene)
+
+  if [[ ! -z "$process_id" ]]; then
+    echo "Dynalene control system is running."
+  else
+    echo "Dynalene control system is not running."
+  fi
+}
+
+# Handle control commands
+case "$1" in
+  start)
+    start
+    ;;
+  stop)
+    stop
+    ;;
+  restart)
+    restart
+    ;;
+  status)
+    status
+    ;;
+  *)
+    echo "Usage: /etc/init.d/dynalene {start|stop|restart|status}"
+    exit 1
+    ;;
+esac
+
+exit 0

@@ -28,7 +28,7 @@ use ts_control_utils::tcp_server::TcpServer;
 
 pub struct TelemetryServer {
     // Sender of the messages to the TCP/IP.
-    _sender_to_tcp: SyncSender<Vec<Value>>,
+    sender_to_tcp: SyncSender<Vec<Value>>,
     // Receiver of the messages to the TCP/IP.
     pub receiver_to_tcp: Receiver<Vec<Value>>,
 }
@@ -48,7 +48,7 @@ impl TelemetryServer {
         let (sender_to_tcp, receiver_to_tcp) = sync_channel(BOUND_SYNC_CHANNEL);
 
         Self {
-            _sender_to_tcp: sender_to_tcp,
+            sender_to_tcp,
             receiver_to_tcp,
         }
     }
@@ -58,7 +58,7 @@ impl TelemetryServer {
     /// # Returns
     /// Sender.
     pub fn get_sender_to_tcp(&self) -> SyncSender<Vec<Value>> {
-        self._sender_to_tcp.clone()
+        self.sender_to_tcp.clone()
     }
 
     /// Process the telemetry.
@@ -67,6 +67,9 @@ impl TelemetryServer {
     /// * `tcp_server` - TCP server.
     /// * `telemetry_server` - Telemetry server.
     pub fn process_telemetry(tcp_server: &mut TcpServer, telemetry_server: &mut TelemetryServer) {
+        // Check the client closed the connection or not.
+        let _ = tcp_server.read_string();
+
         // Check the internal telemetry and send to the TCP/IP.
         if let Ok(telemetry_send) = telemetry_server
             .receiver_to_tcp

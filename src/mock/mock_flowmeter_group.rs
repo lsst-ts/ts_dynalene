@@ -31,7 +31,7 @@ use crate::utility::calculate_modbus_crc_and_update_frame;
 
 pub struct MockFlowmeterGroup {
     // Cyclic redundancy check (CRC) calculator for the Modbus communication.
-    _crc: Crc<u16>,
+    crc: Crc<u16>,
     // The flowmeters connected to as a group with a daisy chain connection
     // bus.
     pub flowmeters: Vec<Flowmeter>,
@@ -61,7 +61,7 @@ impl MockFlowmeterGroup {
         }
 
         Self {
-            _crc: Crc::<u16>::new(&CRC_16_MODBUS),
+            crc: Crc::<u16>::new(&CRC_16_MODBUS),
 
             flowmeters,
         }
@@ -106,7 +106,7 @@ impl MockFlowmeterGroup {
             frame_response[19..23].copy_from_slice(&flowmeter.negative_totalizer.to_be_bytes());
         }
 
-        calculate_modbus_crc_and_update_frame(&self._crc, &mut frame_response);
+        calculate_modbus_crc_and_update_frame(&self.crc, &mut frame_response);
 
         frame_response
     }

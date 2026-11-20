@@ -24,6 +24,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 
 use crate::command::command_format::{CommandFormat, CommandId};
+use crate::controller::Controller;
 use crate::daq::data_acquisition::DataAcquisition;
 use crate::enums::CommandStatus;
 use crate::utility::acknowledge_command;
@@ -40,6 +41,7 @@ pub trait Command {
     /// # Arguments
     /// * `message` - Command message to execute.
     /// * `data_acquisition` - Data acquisition to execute the command.
+    /// * `controller` - Controller to execute the command.
     ///
     /// # Returns
     /// Command execution result. If failed, returns the failure reason.
@@ -47,6 +49,7 @@ pub trait Command {
         &self,
         message: &CommandFormat,
         data_acquisition: Option<&mut DataAcquisition>,
+        controller: Option<&mut Controller>,
     ) -> Result<(), String>;
 }
 
@@ -74,6 +77,7 @@ impl CommandSchema {
     /// # Arguments
     /// * `message` - Command message to execute.
     /// * `data_acquisition` - Data acquisition to execute the command.
+    /// * `controller` - Controller to execute the command.
     ///
     /// # Returns
     /// Command execution result.
@@ -81,11 +85,12 @@ impl CommandSchema {
         &self,
         message: &CommandFormat,
         data_acquisition: Option<&mut DataAcquisition>,
+        controller: Option<&mut Controller>,
     ) -> Value {
         let tag_id = message.payload.get_tag_id();
         let sequence_id = message.sequence_id;
         if let Some(command) = self.commands.get(&CommandId::from(&message.payload)) {
-            return match command.execute(message, data_acquisition) {
+            return match command.execute(message, data_acquisition, controller) {
                 Ok(_) => {
                     acknowledge_command(Some(tag_id), CommandStatus::Success, sequence_id, None)
                 }
@@ -159,6 +164,7 @@ mod tests {
             }))
             .unwrap(),
             None,
+            None,
         );
 
         assert_eq!(
@@ -174,6 +180,7 @@ mod tests {
                 "parameters": {"bit": 0b100000000, "status": true}
             }))
             .unwrap(),
+            None,
             None,
         );
 
@@ -193,6 +200,7 @@ mod tests {
             }))
             .unwrap(),
             Some(&mut data_acquisition),
+            None,
         );
 
         assert_eq!(
@@ -215,6 +223,7 @@ mod tests {
             }))
             .unwrap(),
             Some(&mut data_acquisition),
+            None,
         );
 
         assert_eq!(
@@ -231,6 +240,7 @@ mod tests {
             }))
             .unwrap(),
             Some(&mut data_acquisition),
+            None,
         );
 
         assert_eq!(

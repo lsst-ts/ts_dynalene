@@ -44,13 +44,13 @@ pub struct DataAcquisition {
     // Events to publish
     pub event_queue: EventQueue,
     // Latest telemetry data
-    _latest_telemetry: TelemetryDataAcquisition,
+    latest_telemetry: TelemetryDataAcquisition,
     // Tank level sensors
-    _tank_levels: Vec<TankLevel>,
+    tank_levels: Vec<TankLevel>,
     // Modbus communicator
-    _modbus: ModbusCommunicator,
+    modbus: ModbusCommunicator,
     // The transaction ID for the Modbus TCP communication
-    _transaction_id: u16,
+    transaction_id: u16,
     // Plant model
     pub plant: Option<MockPlant>,
 }
@@ -81,12 +81,12 @@ impl DataAcquisition {
             config,
 
             event_queue: EventQueue::new(),
-            _latest_telemetry: TelemetryDataAcquisition::new(),
+            latest_telemetry: TelemetryDataAcquisition::new(),
 
-            _tank_levels: tank_levels,
+            tank_levels,
 
-            _modbus: ModbusCommunicator::new(),
-            _transaction_id: 0,
+            modbus: ModbusCommunicator::new(),
+            transaction_id: 0,
 
             plant,
         }
@@ -265,8 +265,8 @@ impl DataAcquisition {
         let address = *self.config.addresses["pier_fan"]
             .get(idx)
             .ok_or(String::from("Invalid pier fan index."))?;
-        if self.is_enabled_pier_fan(idx, self._latest_telemetry.digital_inputs_mod7) {
-            let frame_request = self._modbus.create_frame_pier_fan_reset(address);
+        if self.is_enabled_pier_fan(idx, self.latest_telemetry.digital_inputs_mod7) {
+            let frame_request = self.modbus.create_frame_pier_fan_reset(address);
 
             let frame_response;
             if let Some(plant) = &mut self.plant {
@@ -333,9 +333,9 @@ impl DataAcquisition {
         let unit_id = *self.config.addresses["chiller"]
             .get(idx)
             .ok_or(String::from("Invalid chiller index."))?;
-        if self.is_enabled_chiller(idx, self._latest_telemetry.digital_inputs_mod4) {
+        if self.is_enabled_chiller(idx, self.latest_telemetry.digital_inputs_mod4) {
             let transaction_id = self.get_transaction_id();
-            let frame_request = self._modbus.create_frame_chiller_set_temperature(
+            let frame_request = self.modbus.create_frame_chiller_set_temperature(
                 transaction_id,
                 unit_id,
                 temperature_setpoint,
@@ -389,12 +389,12 @@ impl DataAcquisition {
     /// # Returns
     /// The transaction ID.
     fn get_transaction_id(&mut self) -> u16 {
-        let transaction_id = self._transaction_id;
+        let transaction_id = self.transaction_id;
 
-        if self._transaction_id == u16::MAX {
-            self._transaction_id = 0;
+        if self.transaction_id == u16::MAX {
+            self.transaction_id = 0;
         } else {
-            self._transaction_id += 1;
+            self.transaction_id += 1;
         }
 
         transaction_id
@@ -451,9 +451,9 @@ impl DataAcquisition {
             .insert("percentage".to_string(), percentages);
 
         // Cache the latest telemetry data
-        self._latest_telemetry = telemetry;
+        self.latest_telemetry = telemetry;
 
-        self._latest_telemetry.clone()
+        self.latest_telemetry.clone()
     }
 
     /// Read the digital inputs (Mod4, NI-9425).
@@ -509,7 +509,7 @@ impl DataAcquisition {
     /// # Panics
     /// Panics if not in simulation mode.
     fn read_temperatures(&self) -> Vec<f64> {
-        let mut temperatures = self._latest_telemetry.temperatures.clone();
+        let mut temperatures = self.latest_telemetry.temperatures.clone();
         for idx in 0..NUM_TEMPERATURE_HUB {
             let mut frame_response = Vec::new();
             if let Some(plant) = &self.plant {
@@ -520,7 +520,7 @@ impl DataAcquisition {
                 panic!("Not implemented yet.");
             }
 
-            if let Some(values) = self._modbus.read_temperature_from_frame(&frame_response) {
+            if let Some(values) = self.modbus.read_temperature_from_frame(&frame_response) {
                 let values_f64: Vec<f64> = values.iter().map(|value| *value as f64).collect();
                 temperatures
                     [(idx * NUM_TEMPERATURE_CHANNEL)..((idx + 1) * NUM_TEMPERATURE_CHANNEL)]
@@ -543,7 +543,7 @@ impl DataAcquisition {
     /// # Returns
     /// A vector containing the pressures in PSI.
     fn read_pressures(&self) -> Vec<f64> {
-        let mut pressures = self._latest_telemetry.pressures.clone();
+        let mut pressures = self.latest_telemetry.pressures.clone();
 
         let addresses_bus_0 = &self.config.addresses["pressure_transducer_bus_0"];
         let addresses_bus_1 = &self.config.addresses["pressure_transducer_bus_1"];
@@ -598,7 +598,7 @@ impl DataAcquisition {
     /// # Panics
     /// Panics if not in simulation mode.
     fn read_pressure(&self, bus: usize, address: u8) -> Option<f32> {
-        let frame_request = self._modbus.create_frame_read_pressure(address);
+        let frame_request = self.modbus.create_frame_read_pressure(address);
 
         let frame_response;
         if let Some(plant) = &self.plant {
@@ -612,7 +612,7 @@ impl DataAcquisition {
         }
 
         if let Some((address_response, pressure)) =
-            self._modbus.read_pressure_from_frame(&frame_response)
+            self.modbus.read_pressure_from_frame(&frame_response)
         {
             if address_response == address {
                 return Some(pressure);
@@ -652,7 +652,7 @@ impl DataAcquisition {
                         address
                     );
 
-                    match self._latest_telemetry.power_grid_monitors.get(idx) {
+                    match self.latest_telemetry.power_grid_monitors.get(idx) {
                         Some(power_grid_monitor) => {
                             power_grid_monitors.push(power_grid_monitor.clone());
                         }
@@ -679,7 +679,7 @@ impl DataAcquisition {
     /// # Panics
     /// Panics if not in simulation mode.
     fn read_power_grid_monitor(&self, address: u8) -> Option<PowerGridMonitor> {
-        let frame_request = self._modbus.create_frame_read_power_grid_monitor(address);
+        let frame_request = self.modbus.create_frame_read_power_grid_monitor(address);
 
         let frame_response;
         if let Some(plant) = &self.plant {
@@ -693,7 +693,7 @@ impl DataAcquisition {
         }
 
         if let Some(power_grid_monitor) = self
-            ._modbus
+            .modbus
             .read_power_grid_monitor_from_frame(&frame_response)
         {
             let address_received = power_grid_monitor.address;
@@ -758,7 +758,7 @@ impl DataAcquisition {
                         address_request
                     );
 
-                    match self._latest_telemetry.flowmeters.get(idx) {
+                    match self.latest_telemetry.flowmeters.get(idx) {
                         Some(power_grid_monitor) => {
                             flowmeters.push(power_grid_monitor.clone());
                         }
@@ -786,7 +786,7 @@ impl DataAcquisition {
     /// # Panics
     /// Panics if not in simulation mode.
     fn read_flowmeter(&self, bus: usize, address: u8) -> Option<Flowmeter> {
-        let frame_request = self._modbus.create_frame_read_flowmeter(address);
+        let frame_request = self.modbus.create_frame_read_flowmeter(address);
 
         let frame_response;
         if let Some(plant) = &self.plant {
@@ -799,7 +799,7 @@ impl DataAcquisition {
             panic!("Not implemented yet.");
         }
 
-        if let Some(flowmeter) = self._modbus.read_flowmeter_from_frame(&frame_response) {
+        if let Some(flowmeter) = self.modbus.read_flowmeter_from_frame(&frame_response) {
             let address_received = flowmeter.address;
             if address_received == address {
                 return Some(flowmeter);
@@ -844,7 +844,7 @@ impl DataAcquisition {
                             address
                         );
 
-                        match self._latest_telemetry.pier_fans.get(idx) {
+                        match self.latest_telemetry.pier_fans.get(idx) {
                             Some(pier_fan) => {
                                 pier_fans.push(pier_fan.clone());
                             }
@@ -875,10 +875,10 @@ impl DataAcquisition {
     /// Panics if not in simulation mode.
     fn read_pier_fan(&mut self, address: u8) -> Option<PierFan> {
         let frame_requests = [
-            self._modbus.create_frame_read_pier_fan_max_speed(address),
-            self._modbus
+            self.modbus.create_frame_read_pier_fan_max_speed(address),
+            self.modbus
                 .create_frame_read_pier_fan_ref_dc_link_voltage_and_current(address),
-            self._modbus.create_frame_read_pier_fan(address),
+            self.modbus.create_frame_read_pier_fan(address),
         ];
 
         let mut frame_responses = Vec::new();
@@ -895,7 +895,7 @@ impl DataAcquisition {
         }
 
         let max_speed = match self
-            ._modbus
+            .modbus
             .read_pier_fan_max_speed_from_frame(&frame_responses[0])
         {
             Some(speed) => speed,
@@ -912,7 +912,7 @@ impl DataAcquisition {
         };
 
         let (ref_dc_link_voltage, ref_dc_link_current) = match self
-            ._modbus
+            .modbus
             .read_pier_fan_dc_link_voltage_and_current_from_frame(&frame_responses[1])
         {
             Some((voltage, current)) => (voltage, current),
@@ -928,7 +928,7 @@ impl DataAcquisition {
             }
         };
 
-        if let Some(pier_fan) = self._modbus.read_pier_fan_from_frame(
+        if let Some(pier_fan) = self.modbus.read_pier_fan_from_frame(
             max_speed,
             ref_dc_link_voltage,
             ref_dc_link_current,
@@ -984,7 +984,7 @@ impl DataAcquisition {
                             address
                         );
 
-                        match self._latest_telemetry.recirculation_pumps.get(idx) {
+                        match self.latest_telemetry.recirculation_pumps.get(idx) {
                             Some(recirculation_pump) => {
                                 recirculation_pumps.push(recirculation_pump.clone());
                             }
@@ -1014,7 +1014,7 @@ impl DataAcquisition {
     /// # Panics
     /// Panics if not in simulation mode.
     fn read_recirculation_pump(&mut self, address: u8) -> Option<RecirculationPump> {
-        let frame_requests = self._modbus.create_frame_read_recirculation_pump(address);
+        let frame_requests = self.modbus.create_frame_read_recirculation_pump(address);
 
         let mut frame_responses = Vec::new();
         if let Some(plant) = &mut self.plant {
@@ -1029,7 +1029,7 @@ impl DataAcquisition {
             panic!("Not implemented yet.");
         }
 
-        if let Some(recirculation_pump) = self._modbus.read_recirculation_pump_from_frame(
+        if let Some(recirculation_pump) = self.modbus.read_recirculation_pump_from_frame(
             &frame_responses[0],
             &frame_responses[1],
             &frame_responses[2],
@@ -1081,7 +1081,7 @@ impl DataAcquisition {
                             idx
                         );
 
-                        match self._latest_telemetry.chillers.get(idx) {
+                        match self.latest_telemetry.chillers.get(idx) {
                             Some(chiller) => {
                                 chillers.push(chiller.clone());
                             }
@@ -1115,7 +1115,7 @@ impl DataAcquisition {
     /// Panics if not in simulation mode.
     fn read_chiller(&mut self, idx: usize, transaction_id: u16, unit_id: u8) -> Option<Chiller> {
         let frame_request = self
-            ._modbus
+            .modbus
             .create_frame_read_chiller(transaction_id, unit_id);
 
         let frame_response;
@@ -1129,7 +1129,7 @@ impl DataAcquisition {
             panic!("Not implemented yet.");
         }
 
-        if let Some(chiller) = self._modbus.read_chiller_from_frame(&frame_response) {
+        if let Some(chiller) = self.modbus.read_chiller_from_frame(&frame_response) {
             let transaction_id_received = chiller.transaction_id;
             let unit_id_received = chiller.unit_id;
             if (transaction_id_received == transaction_id) && (unit_id_received == unit_id) {
@@ -1155,7 +1155,7 @@ impl DataAcquisition {
     /// # Returns
     /// A vector containing the percentage openings of all PCVs.
     fn read_percentage_of_pressure_control_valves(&self) -> Vec<f64> {
-        let mut percentages = self._latest_telemetry.percentages_pcv.clone();
+        let mut percentages = self.latest_telemetry.percentages_pcv.clone();
         percentages.iter_mut().enumerate().for_each(|(idx, percentage)| {
             if let Some(value) = self.read_percentage_of_pressure_control_valve(idx) {
                 *percentage = value;
@@ -1193,7 +1193,7 @@ impl DataAcquisition {
     /// # Returns
     /// A vector containing the percentage openings of all CMVs.
     fn read_percentage_of_control_mixing_valves(&self) -> Vec<f64> {
-        let mut percentages = self._latest_telemetry.percentages_cmv.clone();
+        let mut percentages = self.latest_telemetry.percentages_cmv.clone();
         percentages.iter_mut().enumerate().for_each(|(idx, percentage)| {
             if let Some(value) = self.read_percentage_of_control_mixing_valve(idx) {
                 *percentage = value;
@@ -1238,8 +1238,8 @@ impl DataAcquisition {
     ///   each tank.
     /// - The second vector contains the remaining percentages for each tank.
     fn read_percentage_of_tank_levels(&self) -> (Vec<f64>, Vec<f64>) {
-        let mut distances = self._latest_telemetry.tank_levels["distance"].clone();
-        let mut percentages = self._latest_telemetry.tank_levels["percentage"].clone();
+        let mut distances = self.latest_telemetry.tank_levels["distance"].clone();
+        let mut percentages = self.latest_telemetry.tank_levels["percentage"].clone();
         for idx in 0..NUM_TANK {
             if let Some((distance_to_full, remaining_percentage)) =
                 self.read_percentage_of_tank_level(idx)
@@ -1274,7 +1274,7 @@ impl DataAcquisition {
         )?;
 
         let (distance_to_full, remaining_percentage) = self
-            ._tank_levels
+            .tank_levels
             .get(idx)?
             .calculate_distance_and_percentage(percentage / 100.0);
         Some((distance_to_full, remaining_percentage))
@@ -1485,9 +1485,9 @@ mod tests {
         assert!(data_acquisition.reset_pier_fan(1).is_ok());
 
         // Valid indices and enabled
-        data_acquisition._latest_telemetry.digital_inputs_mod7 |=
+        data_acquisition.latest_telemetry.digital_inputs_mod7 |=
             DigitalInputMod7::StatusK3.bit_value();
-        data_acquisition._latest_telemetry.digital_inputs_mod7 |=
+        data_acquisition.latest_telemetry.digital_inputs_mod7 |=
             DigitalInputMod7::StatusK4.bit_value();
 
         assert!(data_acquisition.reset_pier_fan(0).is_ok());
@@ -1550,7 +1550,7 @@ mod tests {
 
         // Should succeed because the chiller is enabled and the temperature is
         // within the valid range.
-        data_acquisition._latest_telemetry.digital_inputs_mod4 |=
+        data_acquisition.latest_telemetry.digital_inputs_mod4 |=
             DigitalInputMod4::StatusK21.bit_value();
         assert!(
             data_acquisition
@@ -1558,7 +1558,7 @@ mod tests {
                 .is_ok()
         );
 
-        assert_eq!(data_acquisition._transaction_id, 1);
+        assert_eq!(data_acquisition.transaction_id, 1);
 
         // Check the telemetry to ensure the chiller temperature was set
         // correctly.
@@ -1615,7 +1615,7 @@ mod tests {
 
         // Set the transaction ID close to the maximum value to test the
         // wrap-around behavior.
-        data_acquisition._transaction_id = u16::MAX - 1;
+        data_acquisition.transaction_id = u16::MAX - 1;
         assert_eq!(data_acquisition.get_transaction_id(), u16::MAX - 1);
         assert_eq!(data_acquisition.get_transaction_id(), u16::MAX);
         assert_eq!(data_acquisition.get_transaction_id(), 0);
@@ -1635,19 +1635,28 @@ mod tests {
         let _ = data_acquisition.switch_digital_output(DigitalOutput::OpenMov1, true);
         let _ = data_acquisition.switch_digital_output(DigitalOutput::PowerPierFan1, true);
         let _ = data_acquisition.switch_digital_output(DigitalOutput::PowerPierFan2, true);
+        let _ = data_acquisition.switch_digital_output(DigitalOutput::FanEnable, true);
+
         let _ = data_acquisition.switch_digital_output(DigitalOutput::PowerChiller1, true);
         let _ = data_acquisition.switch_digital_output(DigitalOutput::PowerChiller2, true);
+        let _ = data_acquisition.switch_digital_output(DigitalOutput::StartChiller1, true);
+        let _ = data_acquisition.switch_digital_output(DigitalOutput::StartChiller2, true);
+
         let _ =
             data_acquisition.switch_digital_output(DigitalOutput::PowerRecirculationPump1, true);
         let _ =
             data_acquisition.switch_digital_output(DigitalOutput::PowerRecirculationPump2, true);
+        let _ =
+            data_acquisition.switch_digital_output(DigitalOutput::StartRecirculationPump1, true);
+        let _ =
+            data_acquisition.switch_digital_output(DigitalOutput::StartRecirculationPump2, true);
 
         // Get the telemetry
         let telemetry = data_acquisition.get_telemetry();
 
         assert_eq!(telemetry.digital_inputs_mod4, 62121);
         assert_eq!(telemetry.digital_inputs_mod7, 3);
-        assert_eq!(telemetry.digital_outputs, 2013266689);
+        assert_eq!(telemetry.digital_outputs, 2029060865);
 
         assert_eq!(telemetry.temperatures[0], PLANT_TEMPERATURE as f64);
         assert_eq!(telemetry.pressures[0], PLANT_PRESSURE as f64);
@@ -1660,14 +1669,14 @@ mod tests {
         assert_eq!(telemetry.chillers[0].transaction_id, 0);
         assert_eq!(telemetry.chillers[0].unit_id, 1);
 
-        assert_eq!(data_acquisition._transaction_id, 1);
+        assert_eq!(data_acquisition.transaction_id, 1);
 
         assert_eq!(telemetry.percentages_pcv[0], percentage);
         assert_eq!(telemetry.percentages_cmv[0], percentage);
 
         assert_eq!(telemetry.tank_levels["distance"][0], 263.1773);
 
-        assert_eq!(data_acquisition._latest_telemetry, telemetry);
+        assert_eq!(data_acquisition.latest_telemetry, telemetry);
 
         // Check the messages
         let messages = telemetry.get_messages(2);

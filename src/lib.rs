@@ -23,13 +23,17 @@
 //!
 //! This library is a collection of control system for the Dynalene
 //! control system.
+pub mod application;
 pub mod command;
 pub mod config;
 pub mod constants;
+pub mod controller;
 pub mod daq;
 pub mod enums;
 pub mod event_queue;
 pub mod interface;
 pub mod mock;
+pub mod model;
+pub mod status;
 pub mod telemetry;
 pub mod utility;

@@ -45,15 +45,15 @@ pub struct DataAcquisitionProcess {
     // Data acquisition (DAQ) system
     pub daq: DataAcquisition,
     // Command schema
-    _command_schema: CommandSchema,
+    command_schema: CommandSchema,
     // Sender of the message to the model
-    _sender_to_model: SyncSender<Telemetry>,
+    sender_to_model: SyncSender<Telemetry>,
     // Sender of the message to DAQ
-    _sender_to_daq: SyncSender<CommandFormat>,
+    sender_to_daq: SyncSender<CommandFormat>,
     // Receiver of the message to DAQ
-    _receiver_to_daq: Receiver<CommandFormat>,
+    receiver_to_daq: Receiver<CommandFormat>,
     // Stop the loop.
-    _stop: Arc<AtomicBool>,
+    stop: Arc<AtomicBool>,
 }
 
 impl DataAcquisitionProcess {
@@ -78,14 +78,14 @@ impl DataAcquisitionProcess {
         Self {
             daq: DataAcquisition::new(is_simulation_mode),
 
-            _command_schema: Self::create_command_schema(),
+            command_schema: Self::create_command_schema(),
 
-            _sender_to_model: sender_to_model.clone(),
+            sender_to_model: sender_to_model.clone(),
 
-            _sender_to_daq: sender_to_daq,
-            _receiver_to_daq: receiver_to_daq,
+            sender_to_daq,
+            receiver_to_daq,
 
-            _stop: stop.clone(),
+            stop: stop.clone(),
         }
     }
 
@@ -122,7 +122,7 @@ impl DataAcquisitionProcess {
     /// # Returns
     /// The sender to the data acquisition.
     pub fn get_sender_to_data_acquisition(&self) -> SyncSender<CommandFormat> {
-        self._sender_to_daq.clone()
+        self.sender_to_daq.clone()
     }
 
     /// Run the data acquisition loop.
@@ -136,7 +136,7 @@ impl DataAcquisitionProcess {
 
         // Period of the data acquisition loop in milliseconds.
         let period_loop = (1000.0 / frequency_loop) as u64;
-        while !self._stop.load(Ordering::Relaxed) {
+        while !self.stop.load(Ordering::Relaxed) {
             // Time the data acquisition loop.
             let now = Instant::now();
 
@@ -144,7 +144,7 @@ impl DataAcquisitionProcess {
             // might send multiple messages in a single loop iteration to
             // adjust the valves and others.
             let mut command_result = None;
-            while let Ok(message) = self._receiver_to_daq.try_recv() {
+            while let Ok(message) = self.receiver_to_daq.try_recv() {
                 command_result = self.execute_and_check_internal_command(&message);
 
                 // Stop processing further messages if a command result is
@@ -167,7 +167,7 @@ impl DataAcquisitionProcess {
 
             // Send the telemetry, command result, and events to the model.
             // Ignore the error.
-            let _ = self._sender_to_model.try_send(Telemetry::new(
+            let _ = self.sender_to_model.try_send(Telemetry::new(
                 Some(telemetry_daq),
                 command_result,
                 events,
@@ -200,7 +200,9 @@ impl DataAcquisitionProcess {
     /// # Returns
     /// The command result, or None if it's an internal command.
     fn execute_and_check_internal_command(&mut self, message: &CommandFormat) -> Option<Value> {
-        let result = self._command_schema.execute(message, Some(&mut self.daq));
+        let result = self
+            .command_schema
+            .execute(message, Some(&mut self.daq), None);
 
         // For the internal command, no need to send the result.
         let is_internal_command = message.sequence_id == -1;
@@ -242,13 +244,13 @@ mod tests {
     fn test_new() {
         let control_loop_process = create_data_acquisition_process().0;
 
-        assert_eq!(control_loop_process._command_schema.number_of_commands(), 5);
+        assert_eq!(control_loop_process.command_schema.number_of_commands(), 5);
     }
 
     #[test]
     fn test_run() {
         let (mut data_acquisition, receiver_to_model) = create_data_acquisition_process();
-        let stop = data_acquisition._stop.clone();
+        let stop = data_acquisition.stop.clone();
 
         let sender_to_data_acquisition = data_acquisition.get_sender_to_data_acquisition();
         let handle = spawn(move || {

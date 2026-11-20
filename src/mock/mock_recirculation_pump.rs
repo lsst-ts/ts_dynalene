@@ -47,7 +47,7 @@ use crate::utility::calculate_modbus_crc_and_update_frame;
 
 pub struct MockRecirculationPump {
     // Cyclic redundancy check (CRC) calculator for the Modbus communication.
-    _crc: Crc<u16>,
+    crc: Crc<u16>,
     // Recirculation pump.
     pub recirculation_pump: RecirculationPump,
 }
@@ -62,7 +62,7 @@ impl MockRecirculationPump {
     /// A new instance of `MockRecirculationPump`.
     pub fn new(address: u8) -> Self {
         Self {
-            _crc: Crc::<u16>::new(&CRC_16_MODBUS),
+            crc: Crc::<u16>::new(&CRC_16_MODBUS),
 
             recirculation_pump: Self::create_recirculation_pump(address),
         }
@@ -168,7 +168,7 @@ impl MockRecirculationPump {
             frame_response[3..3 + (data_bytes as usize)].copy_from_slice(&frame_data);
         }
 
-        calculate_modbus_crc_and_update_frame(&self._crc, &mut frame_response);
+        calculate_modbus_crc_and_update_frame(&self.crc, &mut frame_response);
 
         frame_response
     }
